@@ -343,6 +343,20 @@ a:focus {
           animation: upDown 5s infinite;
 }
 
+/* Prevent slider background from causing the section to shift */
+.slider_section {
+  min-height: 600px; /* Adjust this value based on your desired minimum height */
+  overflow: hidden;
+  position: relative;
+}
+
+.carousel-inner {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 @-webkit-keyframes upDown {
   0% {
     -webkit-transform: translateY(-45px);
