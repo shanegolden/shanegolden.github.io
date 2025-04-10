@@ -527,7 +527,7 @@ a:focus {
 
 .about2_section {
   background-color: #f8f8f9;
-  color: #00204a;
+  color: #00204a; /* This will set the text color for the section */
 }
 
 .about2_section .heading_container {
@@ -556,7 +556,7 @@ a:focus {
   display: inline-block;
   padding: 10px 45px;
   background-color: #00bbf0;
-  color: #00204a;
+  color: #00204a; /* Ensure links have this color */
   border-radius: 0px;
   -webkit-transition: all 0.3s;
   transition: all 0.3s;
@@ -566,6 +566,11 @@ a:focus {
 
 .about2_section .detail-box a:hover {
   background-color: #007fa4;
+}
+
+.about2_section .detail-box h3 a,
+.about2_section .detail-box h5 a {
+  color: #00204a; /* Set the color for the links inside h3 and h5 */
 }
 
 .why_section .box {
