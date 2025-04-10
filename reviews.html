@@ -174,8 +174,7 @@
             </h5>
   
             <!-- Snippet shown by default -->
-            <p>It’s my pleasure to recommend Shane Golden, a remarkable individual with whom I have had the privilege of working recently. During our time together, Shane consistently impressed me with his sharp intellect, dedication, and ability to approach challenges creatively and precisely. He has a rare combination of intelligence and interpersonal skills, making him a pleasure to work with. I can confidently say he’s one of the brightest young professionals I’ve encountered.
-</p>
+            <p>It’s my pleasure to recommend Shane Golden, a remarkable individual with whom I have had the privilege of working recently. During our time together, Shane consistently impressed me with his sharp intellect, dedication, and ability to approach challenges creatively and precisely. He has a rare combination of intelligence and interpersonal skills, making him a pleasure to work with. I can confidently say he’s one of the brightest young professionals I’ve encountered.</p>
   
             <!-- Hidden content until "Read more" is clicked -->
             <div class="more-text" style="display: none;">
@@ -209,6 +208,56 @@
     }
   </script>
   <!-- end review 2 section -->
+
+  <!-- review 3 section -->
+  <section class="about_section layout_padding">
+    <div class="container">
+      <div class="heading_container heading_center"></div>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="img-box">
+            <img src="images/r3-west.png" alt="">
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="detail-box">
+            <h3>
+              <a href="https://www.linkedin.com/in/west-ma-7872a3133/" target="_blank" style="all: unset; cursor: pointer; color: inherit;">West Ma</a>
+            </h3>
+            <h5>
+              CEO, Bemtech Corp
+            </h5>
+  
+            <!-- Snippet shown by default -->
+            <p>Shane played a key role in planning and negotiating with TransAlta in February 2018, aiming to repurpose their mothballed data center in Calgary into a Bitcoin mining facility，at that time I was CEO of Bemtech Corp.</p>
+  
+            <!-- Hidden content until "Read more" is clicked -->
+            <div class="more-text" style="display: none;">
+              <p>He and his team also evaluated my Raspberry Pi-based AI device for supporting a desktop blockchain node.</p>
+              <p>I’ve stayed in touch with Shane since the time when Bitcoin dropped from USD $19,800 in December 2017 to around $3,350 in early 2018, and we’ve remained in the same industry as Bitcoin reached $75,000 during the onset of the U.S.-China trade war.</p>
+              <p>I believe Shane possesses deep experience in Bitcoin and blockchain technologies, and I wish him continued success and prosperity in the blockchain industry.</p>
+            </div>
+  
+            <!-- Read more toggle -->
+            <button onclick="toggleReview(this)" class="read-more-btn" style="border: none; background: none; color: #007bff; padding: 0; cursor: pointer;">Read more</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Toggle script -->
+  <script>
+    function toggleReview(button) {
+      const moreText = button.previousElementSibling;
+      const isVisible = moreText.style.display === "block";
+  
+      moreText.style.display = isVisible ? "none" : "block";
+      button.textContent = isVisible ? "Read more" : "Show less";
+    }
+  </script>
+
+  <!-- end review 3 section -->
 
   <!-- info section -->
 
