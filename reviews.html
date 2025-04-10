@@ -111,13 +111,11 @@
 
 
   <!-- review 1 section -->
-
   <section class="about_section layout_padding">
-    <div class="container  ">
-      <div class="heading_container heading_center">
-      </div>
+    <div class="container">
+      <div class="heading_container heading_center"></div>
       <div class="row">
-        <div class="col-md-6 ">
+        <div class="col-md-6">
           <div class="img-box">
             <img src="images/r1-kyle.png" alt="">
           </div>
@@ -130,15 +128,35 @@
             <h5>
               <a href="https://www.somedata.ai/" target="_blank" style="all: unset; cursor: pointer; color: inherit;">CEO SomeData</a>
             </h5>
+  
+            <!-- Snippet shown by default -->
             <p>Working with Shane Golden has been nothing short of exceptional. His professionalism, accountability, and unwavering integrity make him a rare and invaluable asset to any team or organization.</p>
-            <p>Shane has a sharp financial mind and a deep understanding of financial systems that bring clarity and stability to even the most complex operations. Whether he's managing budgets, forecasting cash flow, or streamlining reporting, Shane consistently delivers with precision and insight. His ability to implement and optimize financial systems is unmatched—making processes more efficient, scalable, and easy to manage.</p>
-            <p>Beyond finances, Shane shines in project management and operational execution. He brings structure, consistency, and calm to fast-paced environments, keeping projects on track and teams aligned. His leadership is proactive and solution-oriented, and he’s always thinking ten steps ahead. One of his greatest strengths is his mastery of automation—finding smart ways to remove friction and save time, all while improving the quality of output.</p>
-            <p>If you're looking for someone who combines deep financial expertise with operational excellence and a character rooted in integrity, Shane Golden is your guy. I trust him completely and would recommend him without hesitation.</p>
+  
+            <!-- Hidden content until "Read more" is clicked -->
+            <div class="more-text" style="display: none;">
+              <p>Shane has a sharp financial mind and a deep understanding of financial systems that bring clarity and stability to even the most complex operations. Whether he's managing budgets, forecasting cash flow, or streamlining reporting, Shane consistently delivers with precision and insight. His ability to implement and optimize financial systems is unmatched—making processes more efficient, scalable, and easy to manage.</p>
+              <p>Beyond finances, Shane shines in project management and operational execution. He brings structure, consistency, and calm to fast-paced environments, keeping projects on track and teams aligned. His leadership is proactive and solution-oriented, and he’s always thinking ten steps ahead. One of his greatest strengths is his mastery of automation—finding smart ways to remove friction and save time, all while improving the quality of output.</p>
+              <p>If you're looking for someone who combines deep financial expertise with operational excellence and a character rooted in integrity, Shane Golden is your guy. I trust him completely and would recommend him without hesitation.</p>
+            </div>
+  
+            <!-- Read more toggle -->
+            <button onclick="toggleReview(this)" class="read-more-btn" style="border: none; background: none; color: #007bff; padding: 0; cursor: pointer;">Read more</button>
           </div>
         </div>
       </div>
     </div>
   </section>
+  
+  <!-- Toggle script -->
+  <script>
+    function toggleReview(button) {
+      const moreText = button.previousElementSibling;
+      const isVisible = moreText.style.display === "block";
+  
+      moreText.style.display = isVisible ? "none" : "block";
+      button.textContent = isVisible ? "Read more" : "Show less";
+    }
+  </script>
 
   <!-- end review 1 section -->
 
