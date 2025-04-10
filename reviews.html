@@ -163,11 +163,7 @@
     <div class="container">
       <div class="heading_container heading_center"></div>
       <div class="row">
-        <div class="col-md-6">
-          <div class="img-box">
-            <img src="images/r1-kyle.png" alt="">
-          </div>
-        </div>
+        <!-- TEXT on the LEFT -->
         <div class="col-md-6">
           <div class="detail-box">
             <h3>
@@ -191,11 +187,18 @@
             <button onclick="toggleReview(this)" class="read-more-btn" style="border: none; background: none; color: #007bff; padding: 0; cursor: pointer;">Read more</button>
           </div>
         </div>
+  
+        <!-- IMAGE on the RIGHT -->
+        <div class="col-md-6">
+          <div class="img-box">
+            <img src="images/r1-kyle.png" alt="">
+          </div>
+        </div>
       </div>
     </div>
   </section>
   
-  <!-- Toggle script -->
+  <!-- Toggle script (can be used once globally) -->
   <script>
     function toggleReview(button) {
       const moreText = button.previousElementSibling;
@@ -205,7 +208,7 @@
       button.textContent = isVisible ? "Read more" : "Show less";
     }
   </script>
-        
+
 
   <!-- end review 2 section -->
 
