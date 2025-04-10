@@ -472,6 +472,44 @@ a:focus {
 
 // end about section
 
+// about2 section
+.about2_section {
+  background-color: $primary2;
+  color: #00204a; /* Update text color for all text in this section */
+
+  .heading_container {
+    margin-bottom: 45px;
+  }
+
+  .row {
+    align-items: center;
+  }
+
+  .img-box {
+    img {
+      max-width: 100%;
+    }
+  }
+
+  .detail-box {
+    h3 {
+      font-weight: bold;
+    }
+
+    p {
+      margin-top: 15px;
+    }
+
+    a {
+      color: #00204a; /* Ensure the links have the correct text color */
+      @include hero_btn($primary1, $white, 10px, 45px, 0px);
+      margin-top: 15px;
+    }
+  }
+}
+
+// end about2 section
+
 // why section
 
 .why_section {
