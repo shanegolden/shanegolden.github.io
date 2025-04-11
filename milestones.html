@@ -394,14 +394,16 @@ Coordinated operations and management related to information and data, business 
   
   <!-- Toggle script -->
   <script>
-    function toggleReview(button) {
-      const moreText = button.previousElementSibling;
-      const isVisible = moreText.style.display === "block";
-  
-      moreText.style.display = isVisible ? "none" : "block";
-      button.textContent = isVisible ? "Read more" : "Show less";
-    }
-  </script>
+  function toggleReview(button) {
+    const detailBox = button.closest('.detail-box');
+    const moreText = detailBox.querySelector('.more-text');
+    const isVisible = moreText.style.display === "block";
+
+    moreText.style.display = isVisible ? "none" : "block";
+    button.textContent = isVisible ? "Read more" : "Show less";
+  }
+</script>
+
   <!-- end milestones 6 section -->
 
   <!-- milestones 7 section -->
