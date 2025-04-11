@@ -758,6 +758,9 @@ a:focus {
 
 .client_section .box .img-box img {
   border-radius: 100%;
+  width: 100px; /* Ensure all images have the same width */
+  height: 100px; /* Ensure all images have the same height */
+  object-fit: cover; /* This ensures the image scales to cover the box without distortion */
 }
 
 .client_section .box .client_id {
