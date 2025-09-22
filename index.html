@@ -5,30 +5,39 @@
 
 <script>
   const normalTitle = "Shane Golden";
-  const baseAwayTitle = "The future is waiting";
-  
+  const awayBaseTitle = "The future is waiting1";
+
   let dotCount = 0;
   let titleInterval;
 
   document.addEventListener("visibilitychange", function() {
     if (document.hidden) {
-      // Start smooth dot animation when user leaves the tab
+      // Start "away" animation with dots
       titleInterval = setInterval(() => {
-        dotCount = (dotCount + 1) % 4; // cycles 0 → 1 → 2 → 3 → 0
+        dotCount = (dotCount + 1) % 4; // 0 → 1 → 2 → 3 → 0
         const dots = ".".repeat(dotCount);
-        document.title = baseAwayTitle + dots;
-      }, 100); // faster updates = smoother
+        document.title = awayBaseTitle + dots;
+      }, 100);
     } else {
-      // Stop animation and restore normal title
+      // User returned: stop away animation
       clearInterval(titleInterval);
-      document.title = normalTitle;
       dotCount = 0;
+
+      // Sequence titles on return
+      document.title = "Welcome back";
+      setTimeout(() => {
+        document.title = "Create with Shane";
+      }, 2000); // after 2 seconds
+      setTimeout(() => {
+        document.title = normalTitle;
+      }, 5000); // after 5 seconds (3 seconds after previous)
     }
   });
 
   // Initial title
   document.title = normalTitle;
 </script>
+
  
   <!-- Basic -->
   <meta charset="utf-8" />
@@ -742,6 +751,7 @@
 </body>
 
 </html>
+
 
 
 
