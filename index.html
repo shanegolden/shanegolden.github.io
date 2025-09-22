@@ -4,79 +4,69 @@
 <head>
 
     <script>
-      const normalTitle = "Shane Golden";
-    
+      // Titles
+      const defaultTitle = "Shane Golden";
       const initialAwayTitle = "Wait, come back!";
       const awayBaseTitle = "The future is waiting";
+    
+      // Emojis for the away animation
       const awayEmojis = ["😐", "🫤", "😐", "🫠"];
     
-      const welcomeBackTitle = "Welcome back";
+      // Emojis for welcome back / create with Shane
       const welcomeBackEmoji = "😏";
-      const createWithShaneTitle = "Create with Shane"; 
       const createWithShaneEmoji = "🤯";
     
-      // Max title length for padding after the dots
-      const maxTitleLength = Math.max(
-        initialAwayTitle.length,
-        awayBaseTitle.length + 3, // 3 dots
-        welcomeBackTitle.length,
-        createWithShaneTitle.length
-      );
-    
+      let titleInterval;
       let dotCount = 0;
       let emojiIndex = 0;
-      let titleInterval;
     
-      const isFirstVisit = !localStorage.getItem("visitedBefore");
-      if (isFirstVisit) localStorage.setItem("visitedBefore", "true");
-    
-      function padAfterDots(textWithDots) {
-        // pad after dots so emoji stays in place
-        const padding = "\u00A0".repeat(maxTitleLength - textWithDots.length);
-        return textWithDots + padding;
+      // Pad spaces after dots to keep emoji in same place
+      function padAfterDots(str) {
+        const totalLength = 3; // max dots count
+        const currentDots = (str.match(/\.+$/) || [""])[0].length;
+        const padding = " ".repeat(totalLength - currentDots);
+        return str + padding;
       }
     
       function startAwayAnimation() {
-          // Initial away title without emoji
-          document.title = initialAwayTitle;
-        
-          setTimeout(() => {
-            titleInterval = setInterval(() => {
-              dotCount = (dotCount % 3) + 1;
-              emojiIndex = (emojiIndex + 1) % awayEmojis.length;
-              const dots = ".".repeat(dotCount); // right after text
-              const titleWithDots = awayBaseTitle + dots;
-              document.title = padAfterDots(titleWithDots) + " " + awayEmojis[emojiIndex];
-            }, 400);
-          }, 1000);
-        }
+        // Show initial away title with no emoji
+        document.title = initialAwayTitle;
     
-      function stopAwayAnimation() {
-        clearInterval(titleInterval);
-        dotCount = 0;
-        emojiIndex = 0;
-    
-        if (!isFirstVisit) {
-          document.title = padAfterDots(welcomeBackTitle) + " " + welcomeBackEmoji;
-          setTimeout(() => {
-            document.title = padAfterDots(createWithShaneTitle) + " " + createWithShaneEmoji;
-          }, 2000);
-          setTimeout(() => { document.title = normalTitle; }, 5000);
-        } else {
-          document.title = normalTitle;
-        }
+        setTimeout(() => {
+          titleInterval = setInterval(() => {
+            dotCount = (dotCount + 1) % 4; // 0 to 3 dots
+            emojiIndex = (emojiIndex + 1) % awayEmojis.length;
+            const dots = ".".repeat(dotCount); // dots immediately after text
+            const titleWithDots = awayBaseTitle + dots;
+            document.title = padAfterDots(titleWithDots) + " " + awayEmojis[emojiIndex];
+          }, 400);
+        }, 1000);
       }
     
-      document.addEventListener("visibilitychange", function() {
+      function showWelcomeBackSequence() {
+        clearInterval(titleInterval);
+        document.title = `Welcome back ${welcomeBackEmoji}`;
+    
+        setTimeout(() => {
+          document.title = `Create with Shane ${createWithShaneEmoji}`;
+        }, 2000);
+    
+        setTimeout(() => {
+          document.title = defaultTitle;
+        }, 5000);
+      }
+    
+      document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
           startAwayAnimation();
         } else {
-          stopAwayAnimation();
+          // Only show welcome back sequence if not the first visit
+          if (sessionStorage.getItem("visitedBefore")) {
+            showWelcomeBackSequence();
+          }
+          sessionStorage.setItem("visitedBefore", "true");
         }
       });
-    
-      // Initialize title
-      document.title = normalTitle;
     </script>
 
  
@@ -792,6 +782,7 @@
 </body>
 
 </html>
+
 
 
 
