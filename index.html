@@ -3,21 +3,21 @@
 
 <head>
 
-  <script>
+ <script>
     const defaultTitle = "Shane Golden";
     const initialAwayTitle = "Wait, come back!";
     const awayBaseTitle = "The future is waiting";
     const awayEmojis = ["😐", "🫤", "😐", "🫠"]; // emoji sequence for away
     const welcomeBackEmoji = "🐐";
-    const createWithShaneEmoji = "😉";
+    const createWithShaneEmoji = "🫶";
     
     let awayInterval = null;
     let dotCount = 0;
     const maxDots = 3;
     
     // Track if user visited before
-    const visitedBefore = sessionStorage.getItem("visitedBefore") === "true";
-    sessionStorage.setItem("visitedBefore", "true");
+    let firstVisit = sessionStorage.getItem("firstVisit") !== "true";
+    sessionStorage.setItem("firstVisit", "true");
     
     // Helper: fixed-width dots to keep emoji in place
     function getDots(count) {
@@ -39,13 +39,13 @@
           dotCount = (dotCount + 1) % (maxDots + 1);
           emojiIndex = (emojiIndex + 1) % awayEmojis.length; // update emoji every dot change
           document.title = awayBaseTitle + getDots(dotCount) + awayEmojis[emojiIndex];
-        }, 400); // 400ms per dot update
-      }, 1000); // pause 1s on "Wait, come back!" before starting
+        }, 400);
+      }, 1000);
     }
     
     // Welcome back sequence
     function showWelcomeBackSequence() {
-      clearInterval(awayInterval); // stop away animation
+      clearInterval(awayInterval);
       const fixedSpace = "\u00A0".repeat(maxDots);
     
       document.title = `Welcome back!${fixedSpace}${welcomeBackEmoji}`;
@@ -62,16 +62,22 @@
     // Visibility change handler
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
-        if (visitedBefore) startAwayAnimation();
+        // Always start away animation, even on first visit
+        startAwayAnimation();
       } else {
-        if (visitedBefore) showWelcomeBackSequence();
-        else document.title = defaultTitle;
+        if (!firstVisit) {
+          showWelcomeBackSequence();
+        } else {
+          document.title = defaultTitle;
+          firstVisit = false; // mark that user has now returned at least once
+        }
       }
     });
     
     // Initialize title on page load
     document.title = defaultTitle;
     </script>
+
 
  
   <!-- Basic -->
@@ -786,6 +792,7 @@
 </body>
 
 </html>
+
 
 
 
