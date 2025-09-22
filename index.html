@@ -3,64 +3,60 @@
 
 <head>
 
-<style>
-  /* Optional: smooth fade for dots */
-  .title-dot {
-    transition: opacity 0.2s ease-in-out;
-    display: inline-block;
-  }
-</style>
-
-<script>
-  const normalTitle = "Shane Golden";
-  const awayBaseTitle = "The future is waiting";
-  const awayEmojis = ["😐", "🫤"]; // alternate emoji
-  let dotCount = 0;
-  let emojiIndex = 0;
-  let titleInterval;
-
-  // Track first visit
-  const isFirstVisit = !localStorage.getItem("visitedBefore");
-  if (isFirstVisit) {
-    localStorage.setItem("visitedBefore", "true");
-  }
-
-  function startAwayAnimation() {
-    titleInterval = setInterval(() => {
-      dotCount = (dotCount + 1) % 4; // 0-3 dots
-      emojiIndex = (emojiIndex + 1) % awayEmojis.length; // alternate emoji
-
-      // Keep emoji in place by adding fixed-width spaces after dots
-      const dots = ".".repeat(dotCount) + "\u00A0".repeat(3 - dotCount); // 3 is max dots
-      document.title = `${awayBaseTitle}${dots} ${awayEmojis[emojiIndex]}`;
-    }, 100);
-  }
-
-  function stopAwayAnimation() {
-    clearInterval(titleInterval);
-    dotCount = 0;
-    emojiIndex = 0;
-
-    if (!isFirstVisit) {
-      document.title = "Welcome back";
-      setTimeout(() => { document.title = "Create with Shane"; }, 2000);
-      setTimeout(() => { document.title = normalTitle; }, 5000);
-    } else {
-      document.title = normalTitle;
+  <script>
+    const normalTitle = "Shane Golden";
+    const awayBaseTitle = "The future is waiting";
+    const awayEmojis = ["⏳", "😐", "🫤", "🫠"]; // new emoji sequence
+    const welcomeBackTitle = "Welcome back 😏";
+    const createWithShaneTitle = "Create with Shane 🤯";
+  
+    let dotCount = 0;
+    let emojiIndex = 0;
+    let titleInterval;
+  
+    // Track first visit
+    const isFirstVisit = !localStorage.getItem("visitedBefore");
+    if (isFirstVisit) {
+      localStorage.setItem("visitedBefore", "true");
     }
-  }
-
-  document.addEventListener("visibilitychange", function() {
-    if (document.hidden) {
-      startAwayAnimation();
-    } else {
-      stopAwayAnimation();
+  
+    function startAwayAnimation() {
+      titleInterval = setInterval(() => {
+        dotCount = (dotCount + 1) % 4; // 0-3 dots
+        emojiIndex = (emojiIndex + 1) % awayEmojis.length; // cycle through new emojis
+  
+        // Keep emoji in place using fixed-width spaces
+        const dots = ".".repeat(dotCount) + "\u00A0".repeat(3 - dotCount);
+        document.title = `${awayBaseTitle}${dots} ${awayEmojis[emojiIndex]}`;
+      }, 300);
     }
-  });
+  
+    function stopAwayAnimation() {
+      clearInterval(titleInterval);
+      dotCount = 0;
+      emojiIndex = 0;
+  
+      if (!isFirstVisit) {
+        document.title = welcomeBackTitle;
+        setTimeout(() => { document.title = createWithShaneTitle; }, 2000);
+        setTimeout(() => { document.title = normalTitle; }, 5000);
+      } else {
+        document.title = normalTitle;
+      }
+    }
+  
+    document.addEventListener("visibilitychange", function() {
+      if (document.hidden) {
+        startAwayAnimation();
+      } else {
+        stopAwayAnimation();
+      }
+    });
+  
+    // Initial title
+    document.title = normalTitle;
+  </script>
 
-  // Initial title
-  document.title = normalTitle;
-</script>
  
   <!-- Basic -->
   <meta charset="utf-8" />
@@ -774,6 +770,7 @@
 </body>
 
 </html>
+
 
 
 
