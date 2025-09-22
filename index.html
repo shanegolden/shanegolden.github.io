@@ -4,82 +4,75 @@
 <head>
 
   <script>
-   const defaultTitle = "Shane Golden";
-   const initialAwayTitle = "Wait, come back!";
-   const awayBaseTitle = "The future is waiting";
-   const awayEmojis = ["😐", "🫤", "😐", "🫠"];
-   const welcomeBackEmoji = "😏";
-   const createWithShaneEmoji = "🤯";
-   
-   let awayInterval = null;
-   let dotCount = 0;
-   let emojiIndex = 0;
-   const maxDots = 3; // max dots for spacing
-   
-   // Track if user visited before
-   const visitedBefore = sessionStorage.getItem("visitedBefore") === "true";
-   sessionStorage.setItem("visitedBefore", "true");
-   
-   // Helper: fixed-width dots to keep emoji in place
-   function getDots(count) {
-     const dots = ".".repeat(count);
-     const padding = "\u00A0".repeat(maxDots - count);
-     return dots + padding;
-   }
-   
-   // Away animation: show "Wait, come back!" first, then cycle future
-   function startAwayAnimation() {
-     clearInterval(awayInterval);
-     document.title = initialAwayTitle; // show first
-     const fixedSpace = "\u00A0".repeat(maxDots);
-   
-     setTimeout(() => {
-       dotCount = 0;
-       emojiIndex = 0;
-   
-       awayInterval = setInterval(() => {
-         dotCount = (dotCount + 1) % (maxDots + 1);
-         if (dotCount === 0) emojiIndex = (emojiIndex + 1) % awayEmojis.length;
-         document.title = awayBaseTitle + getDots(dotCount) + awayEmojis[emojiIndex];
-       }, 400);
-     }, 1000); // pause 1 second on "Wait, come back!" before starting dots loop
-   }
-   
-   // Welcome back sequence
-   function showWelcomeBackSequence() {
-     clearInterval(awayInterval); // stop away animation
-     const fixedSpace = "\u00A0".repeat(maxDots);
-   
-     document.title = `Welcome back!${fixedSpace}${welcomeBackEmoji}`;
-   
-     setTimeout(() => {
-       document.title = `Create with Shane${fixedSpace}${createWithShaneEmoji}`;
-     }, 2000);
-   
-     setTimeout(() => {
-       document.title = defaultTitle;
-     }, 5000);
-   }
-   
-   // Visibility change handler
-   document.addEventListener("visibilitychange", () => {
-     if (document.hidden) {
-       if (visitedBefore) {
-         startAwayAnimation();
-       }
-     } else {
-       if (visitedBefore) {
-         showWelcomeBackSequence();
-       } else {
-         // First-time visitors: just show default title
-         document.title = defaultTitle;
-       }
-     }
-   });
-   
-   // Initialize title on page load
-   document.title = defaultTitle;
-   </script>
+    const defaultTitle = "Shane Golden";
+    const initialAwayTitle = "Wait, come back!";
+    const awayBaseTitle = "The future is waiting";
+    const awayEmojis = ["⏳", "😐", "🫤", "🫠"]; // emoji sequence for away
+    const welcomeBackEmoji = "🐐";
+    const createWithShaneEmoji = "😉";
+    
+    let awayInterval = null;
+    let dotCount = 0;
+    const maxDots = 3;
+    
+    // Track if user visited before
+    const visitedBefore = sessionStorage.getItem("visitedBefore") === "true";
+    sessionStorage.setItem("visitedBefore", "true");
+    
+    // Helper: fixed-width dots to keep emoji in place
+    function getDots(count) {
+      const dots = ".".repeat(count);
+      const padding = "\u00A0".repeat(maxDots - count);
+      return dots + padding;
+    }
+    
+    // Away animation: show "Wait, come back!" first, then cycle future
+    function startAwayAnimation() {
+      clearInterval(awayInterval);
+      document.title = initialAwayTitle; // show first
+    
+      setTimeout(() => {
+        dotCount = 0;
+        let emojiIndex = 0;
+    
+        awayInterval = setInterval(() => {
+          dotCount = (dotCount + 1) % (maxDots + 1);
+          emojiIndex = (emojiIndex + 1) % awayEmojis.length; // update emoji every dot change
+          document.title = awayBaseTitle + getDots(dotCount) + awayEmojis[emojiIndex];
+        }, 400); // 400ms per dot update
+      }, 1000); // pause 1s on "Wait, come back!" before starting
+    }
+    
+    // Welcome back sequence
+    function showWelcomeBackSequence() {
+      clearInterval(awayInterval); // stop away animation
+      const fixedSpace = "\u00A0".repeat(maxDots);
+    
+      document.title = `Welcome back!${fixedSpace}${welcomeBackEmoji}`;
+    
+      setTimeout(() => {
+        document.title = `Create with Shane${fixedSpace}${createWithShaneEmoji}`;
+      }, 2000);
+    
+      setTimeout(() => {
+        document.title = defaultTitle;
+      }, 5000);
+    }
+    
+    // Visibility change handler
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if (visitedBefore) startAwayAnimation();
+      } else {
+        if (visitedBefore) showWelcomeBackSequence();
+        else document.title = defaultTitle;
+      }
+    });
+    
+    // Initialize title on page load
+    document.title = defaultTitle;
+    </script>
+
  
   <!-- Basic -->
   <meta charset="utf-8" />
@@ -793,6 +786,7 @@
 </body>
 
 </html>
+
 
 
 
