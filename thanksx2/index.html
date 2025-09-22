@@ -2,6 +2,19 @@
 <html>
 
 <head>
+
+<script>
+  const originalTitle = "Shane Golden";
+  const awayTitle = "Wait, come back!";
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      document.title = awayTitle;
+    } else {
+      document.title = originalTitle;
+    }
+  });
+</script>
  
   <!-- Basic -->
   <meta charset="utf-8" />
