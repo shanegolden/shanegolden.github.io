@@ -22,11 +22,12 @@
     let firstVisit = sessionStorage.getItem("firstVisit") !== "true";
     sessionStorage.setItem("firstVisit", "true");
     
-    // Helper: fixed-width dots to keep emoji in place
+   // Helper: fixed-width dots with extra spacing for emoji alignment
     function getDots(count) {
       const dots = ".".repeat(count);
-      const padding = "\u00A0".repeat(maxDots - count);
-      return dots + padding;
+      const paddingAfterDots = "\u00A0"; // add one non-breaking space after dots
+      const paddingForEmoji = "\u00A0".repeat(maxDots - count); // keep emoji in same spot
+      return dots + paddingAfterDots + paddingForEmoji;
     }
     
     // Away animation: show "Wait, come back!" first, then cycle future
@@ -795,6 +796,7 @@
 </body>
 
 </html>
+
 
 
 
