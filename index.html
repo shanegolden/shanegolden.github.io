@@ -9,67 +9,72 @@
       const awayBaseTitle = "The future is waiting";
       const awayEmojis = ["😐", "🫤", "😐", "🫠"];
       const welcomeBackEmoji = "😏";
-      const createWithShaneEmoji = "⭐️";
-    
-      let awayInterval;
+      const createWithShaneEmoji = "🤯";
+      
+      let awayInterval = null;
       let dotCount = 0;
       let emojiIndex = 0;
       const maxDots = 3; // max dots for spacing
-    
-      // Generate fixed-width dots
+      
+      // Helper: fixed-width dots to keep emoji in place
       function getDots(count) {
         const dots = ".".repeat(count);
         const padding = "\u00A0".repeat(maxDots - count);
         return dots + padding;
       }
-    
-      // Smooth away animation like typing
+      
+      // Away animation: cycle dots + emoji
       function startAwayAnimation() {
-        document.title = initialAwayTitle;
-    
-        setTimeout(() => {
-          awayInterval = setInterval(() => {
-            // Cycle dotCount: 0 → 1 → 2 → 3 → 0 ...
-            dotCount = (dotCount + 1) % (maxDots + 1);
-            // Only advance emoji when dots reset
-            if (dotCount === 0) emojiIndex = (emojiIndex + 1) % awayEmojis.length;
-    
-            document.title = awayBaseTitle + getDots(dotCount) + awayEmojis[emojiIndex];
-          }, 400);
-        }, 1000);
+        clearInterval(awayInterval);
+        dotCount = 0;
+        emojiIndex = 0;
+        awayInterval = setInterval(() => {
+          dotCount = (dotCount + 1) % (maxDots + 1);
+          if (dotCount === 0) emojiIndex = (emojiIndex + 1) % awayEmojis.length;
+          document.title = awayBaseTitle + getDots(dotCount) + awayEmojis[emojiIndex];
+        }, 400);
       }
-    
+      
+      // Welcome back sequence
       function showWelcomeBackSequence() {
         clearInterval(awayInterval);
-    
         const fixedSpace = "\u00A0".repeat(maxDots);
-    
-        // Welcome back
+      
         document.title = `Welcome back!${fixedSpace}${welcomeBackEmoji}`;
-    
+      
         setTimeout(() => {
-          // Create with Shane
           document.title = `Create with Shane${fixedSpace}${createWithShaneEmoji}`;
         }, 2000);
-    
+      
         setTimeout(() => {
-          // Return to normal title
           document.title = defaultTitle;
         }, 5000);
       }
-    
-      // Only show welcome back if user has visited before
+      
+      // Track if user visited before
+      const visitedBefore = sessionStorage.getItem("visitedBefore") === "true";
+      sessionStorage.setItem("visitedBefore", "true");
+      
+      // Visibility change handler
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
+          // Start away animation only when leaving
           startAwayAnimation();
         } else {
-          if (sessionStorage.getItem("visitedBefore")) {
+          // Show welcome back sequence only if user has visited before
+          if (visitedBefore) {
             showWelcomeBackSequence();
+          } else {
+            // First time visit: just show default title
+            document.title = defaultTitle;
           }
-          sessionStorage.setItem("visitedBefore", "true");
         }
       });
-    </script>
+      
+      // Initialize title on page load
+      document.title = defaultTitle;
+      </script>
+
  
   <!-- Basic -->
   <meta charset="utf-8" />
@@ -783,6 +788,7 @@
 </body>
 
 </html>
+
 
 
 
