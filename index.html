@@ -9,7 +9,10 @@
     const awayBaseTitle = "The future is waiting";
     const awayEmojis = ["😐", "🫤", "😐", "🫠"]; // emoji sequence for away
     const welcomeBackEmoji = "🐐";
-    const createWithShaneEmoji = "😏";
+    const createWithShaneEmojis = ["☄️","😇","🫶","😏","🔋","⭐️","🤯","🌈","🤩","⭐️","✨","💫","🌠"];
+
+    // Pick one randomly
+    const createWithShaneEmoji = createWithShaneEmojis[Math.floor(Math.random() * createWithShaneEmojis.length)];
     
     let awayInterval = null;
     let dotCount = 0;
@@ -792,6 +795,7 @@
 </body>
 
 </html>
+
 
 
 
