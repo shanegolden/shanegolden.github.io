@@ -5,23 +5,26 @@
 
 <script>
   const normalTitle = "Shane Golden";
-  const awayBaseTitle = "The future is waiting1";
-
+  const awayBaseTitle = "The future is waiting";
+  const awayEmojis = ["😐", "🫤"]; // cycle between these two
   let dotCount = 0;
+  let emojiIndex = 0;
   let titleInterval;
 
   document.addEventListener("visibilitychange", function() {
     if (document.hidden) {
-      // Start "away" animation with dots
+      // Start "away" animation with dots and alternating emojis
       titleInterval = setInterval(() => {
-        dotCount = (dotCount + 1) % 4; // 0 → 1 → 2 → 3 → 0
+        dotCount = (dotCount + 1) % 4; // 0,1,2,3 dots
+        emojiIndex = (emojiIndex + 1) % awayEmojis.length; // alternate emoji
         const dots = ".".repeat(dotCount);
-        document.title = awayBaseTitle + dots;
-      }, 100);
+        document.title = awayBaseTitle + dots + " " + awayEmojis[emojiIndex];
+      }, 100); // change every 0.5s
     } else {
       // User returned: stop away animation
       clearInterval(titleInterval);
       dotCount = 0;
+      emojiIndex = 0;
 
       // Sequence titles on return
       document.title = "Welcome back";
@@ -30,13 +33,14 @@
       }, 2000); // after 2 seconds
       setTimeout(() => {
         document.title = normalTitle;
-      }, 5000); // after 5 seconds (3 seconds after previous)
+      }, 5000); // after 5 seconds total
     }
   });
 
   // Initial title
   document.title = normalTitle;
 </script>
+
 
  
   <!-- Basic -->
@@ -751,6 +755,7 @@
 </body>
 
 </html>
+
 
 
 
