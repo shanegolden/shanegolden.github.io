@@ -3,32 +3,41 @@
 
 <head>
 
-  <script>
+    <script>
     const normalTitle = "Shane Golden";
     const awayBaseTitle = "The future is waiting";
-    const awayEmojis = ["😐", "🫤", "😐", "🫠"]; // new emoji sequence
-    const welcomeBackTitle = "Welcome back 😏";
-    const createWithShaneTitle = "Create with Shane 🤯";
+    const awayEmojis = ["⏳", "😐", "🫤", "🫠"]; // emojis for away
+    const welcomeBackTitle = "Welcome back"; // no emoji here, we’ll add it manually
+    const welcomeBackEmoji = "😏";
+    const createWithShaneTitle = "Create with Shane"; 
+    const createWithShaneEmoji = "🤯";
+  
+    const maxTitleLength = Math.max(
+      awayBaseTitle.length + 3, // max 3 dots
+      welcomeBackTitle.length,
+      createWithShaneTitle.length
+    );
   
     let dotCount = 0;
     let emojiIndex = 0;
     let titleInterval;
   
-    // Track first visit
     const isFirstVisit = !localStorage.getItem("visitedBefore");
-    if (isFirstVisit) {
-      localStorage.setItem("visitedBefore", "true");
+    if (isFirstVisit) localStorage.setItem("visitedBefore", "true");
+  
+    function padTitle(text, totalLength) {
+      const padding = "\u00A0".repeat(totalLength - text.length);
+      return text + padding;
     }
   
     function startAwayAnimation() {
       titleInterval = setInterval(() => {
-        dotCount = (dotCount + 1) % 4; // 0-3 dots
-        emojiIndex = (emojiIndex + 1) % awayEmojis.length; // cycle through new emojis
+        dotCount = (dotCount % 3) + 1;
+        emojiIndex = (emojiIndex + 1) % awayEmojis.length;
   
-        // Keep emoji in place using fixed-width spaces
         const dots = ".".repeat(dotCount) + "\u00A0".repeat(3 - dotCount);
-        document.title = `${awayBaseTitle}${dots} ${awayEmojis[emojiIndex]}`;
-      }, 100);
+        document.title = `${padTitle(awayBaseTitle, maxTitleLength)}${dots} ${awayEmojis[emojiIndex]}`;
+      }, 400);
     }
   
     function stopAwayAnimation() {
@@ -37,8 +46,10 @@
       emojiIndex = 0;
   
       if (!isFirstVisit) {
-        document.title = welcomeBackTitle;
-        setTimeout(() => { document.title = createWithShaneTitle; }, 2000);
+        document.title = `${padTitle(welcomeBackTitle, maxTitleLength)} ${welcomeBackEmoji}`;
+        setTimeout(() => {
+          document.title = `${padTitle(createWithShaneTitle, maxTitleLength)} ${createWithShaneEmoji}`;
+        }, 2000);
         setTimeout(() => { document.title = normalTitle; }, 5000);
       } else {
         document.title = normalTitle;
@@ -53,9 +64,10 @@
       }
     });
   
-    // Initial title
+    // Initialize title
     document.title = normalTitle;
   </script>
+
 
  
   <!-- Basic -->
@@ -770,6 +782,7 @@
 </body>
 
 </html>
+
 
 
 
