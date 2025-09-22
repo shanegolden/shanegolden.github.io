@@ -4,16 +4,34 @@
 <head>
 
 <script>
-  const originalTitle = "Shane Golden";
-  const awayTitle = "The future is waiting!";
+  const normalTitle = "Shane Golden";
+  const awayTitles = [
+    "The future is waiting",
+    "The future is waiting.",
+    "The future is waiting..",
+    "The future is waiting..."
+  ];
 
-  document.addEventListener("visibilitychange", () => {
+  let i = 0;
+  let titleInterval;
+
+  document.addEventListener("visibilitychange", function() {
     if (document.hidden) {
-      document.title = awayTitle;
+      // User left the tab → start cycling away titles
+      titleInterval = setInterval(() => {
+        document.title = awayTitles[i];
+        i = (i + 1) % awayTitles.length;
+      }, 500); // update every 500ms
     } else {
-      document.title = originalTitle;
+      // User returned → stop cycling and restore normal title
+      clearInterval(titleInterval);
+      document.title = normalTitle;
+      i = 0;
     }
   });
+
+  // Set initial title on page load
+  document.title = normalTitle;
 </script>
  
   <!-- Basic -->
@@ -728,6 +746,7 @@
 </body>
 
 </html>
+
 
 
 
