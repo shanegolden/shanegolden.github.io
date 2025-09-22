@@ -20,13 +20,8 @@
       let dotCount = 0;
       let emojiIndex = 0;
     
-      // Pad spaces after dots to keep emoji in same place
-      function padAfterDots(str) {
-        const totalLength = 3; // max dots count
-        const currentDots = (str.match(/\.+$/) || [""])[0].length;
-        const padding = " ".repeat(totalLength - currentDots);
-        return str + padding;
-      }
+      // Total dot width reserved to align emoji (max 3 dots)
+      const maxDots = 3;
     
       function startAwayAnimation() {
         // Show initial away title with no emoji
@@ -34,21 +29,25 @@
     
         setTimeout(() => {
           titleInterval = setInterval(() => {
-            dotCount = (dotCount + 1) % 4; // 0 to 3 dots
+            dotCount = (dotCount + 1) % 4; // 0–3 dots
             emojiIndex = (emojiIndex + 1) % awayEmojis.length;
-            const dots = ".".repeat(dotCount); // dots immediately after text
-            const titleWithDots = awayBaseTitle + dots;
-            document.title = padAfterDots(titleWithDots) + " " + awayEmojis[emojiIndex];
+    
+            // Create dots string and pad to maxDots with non-breaking spaces
+            const dots = ".".repeat(dotCount) + "\u00A0".repeat(maxDots - dotCount);
+            document.title = awayBaseTitle + dots + awayEmojis[emojiIndex];
           }, 400);
         }, 1000);
       }
     
       function showWelcomeBackSequence() {
         clearInterval(titleInterval);
-        document.title = `Welcome back! ${welcomeBackEmoji}`;
+    
+        // Show welcome back aligned with same emoji position
+        const spaceAfterText = "\u00A0".repeat(maxDots); // reserve same width as dots
+        document.title = `Welcome back!${spaceAfterText}${welcomeBackEmoji}`;
     
         setTimeout(() => {
-          document.title = `Create with Shane ${createWithShaneEmoji}`;
+          document.title = `Create with Shane${spaceAfterText}${createWithShaneEmoji}`;
         }, 2000);
     
         setTimeout(() => {
@@ -68,6 +67,7 @@
         }
       });
     </script>
+
 
  
   <!-- Basic -->
@@ -782,6 +782,7 @@
 </body>
 
 </html>
+
 
 
 
