@@ -17,7 +17,7 @@
         dotCount = (dotCount + 1) % 4; // cycles 0 → 1 → 2 → 3 → 0
         const dots = ".".repeat(dotCount);
         document.title = baseAwayTitle + dots;
-      }, 300); // faster updates = smoother
+      }, 200); // faster updates = smoother
     } else {
       // Stop animation and restore normal title
       clearInterval(titleInterval);
@@ -742,6 +742,7 @@
 </body>
 
 </html>
+
 
 
 
