@@ -21,7 +21,7 @@
       titleInterval = setInterval(() => {
         document.title = awayTitles[i];
         i = (i + 1) % awayTitles.length;
-      }, 500); // update every 500ms
+      }, 350); // update every 350ms
     } else {
       // User returned → stop cycling and restore normal title
       clearInterval(titleInterval);
@@ -746,6 +746,7 @@
 </body>
 
 </html>
+
 
 
 
