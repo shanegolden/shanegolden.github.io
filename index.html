@@ -5,32 +5,28 @@
 
 <script>
   const normalTitle = "Shane Golden";
-  const awayTitles = [
-    "The future is waiting",
-    "The future is waiting.",
-    "The future is waiting..",
-    "The future is waiting..."
-  ];
-
-  let i = 0;
+  const baseAwayTitle = "The future is waiting";
+  
+  let dotCount = 0;
   let titleInterval;
 
   document.addEventListener("visibilitychange", function() {
     if (document.hidden) {
-      // User left the tab → start cycling away titles
+      // Start smooth dot animation when user leaves the tab
       titleInterval = setInterval(() => {
-        document.title = awayTitles[i];
-        i = (i + 1) % awayTitles.length;
-      }, 350); // update every 350ms
+        dotCount = (dotCount + 1) % 4; // cycles 0 → 1 → 2 → 3 → 0
+        const dots = ".".repeat(dotCount);
+        document.title = baseAwayTitle + dots;
+      }, 300); // faster updates = smoother
     } else {
-      // User returned → stop cycling and restore normal title
+      // Stop animation and restore normal title
       clearInterval(titleInterval);
       document.title = normalTitle;
-      i = 0;
+      dotCount = 0;
     }
   });
 
-  // Set initial title on page load
+  // Initial title
   document.title = normalTitle;
 </script>
  
@@ -746,6 +742,7 @@
 </body>
 
 </html>
+
 
 
 
