@@ -6,21 +6,19 @@
     <script>
       const normalTitle = "Shane Golden";
     
-      // Away animation titles
       const initialAwayTitle = "Wait, come back!";
       const awayBaseTitle = "The future is waiting";
-      const awayEmojis = ["⏳", "😐", "🫤", "🫠"]; 
+      const awayEmojis = ["😐", "🫤", "😐", "🫠"];
     
-      // Welcome back sequence
       const welcomeBackTitle = "Welcome back";
       const welcomeBackEmoji = "😏";
       const createWithShaneTitle = "Create with Shane"; 
       const createWithShaneEmoji = "🤯";
     
-      // Compute max title length for padding so emojis stay aligned
+      // Max title length for padding after the dots
       const maxTitleLength = Math.max(
         initialAwayTitle.length,
-        awayBaseTitle.length + 3, // max 3 dots
+        awayBaseTitle.length + 3, // 3 dots
         welcomeBackTitle.length,
         createWithShaneTitle.length
       );
@@ -32,25 +30,26 @@
       const isFirstVisit = !localStorage.getItem("visitedBefore");
       if (isFirstVisit) localStorage.setItem("visitedBefore", "true");
     
-      function padTitle(text, totalLength) {
-        const padding = "\u00A0".repeat(totalLength - text.length);
-        return text + padding;
+      function padAfterDots(textWithDots) {
+        // pad after dots so emoji stays in place
+        const padding = "\u00A0".repeat(maxTitleLength - textWithDots.length);
+        return textWithDots + padding;
       }
     
       function startAwayAnimation() {
-        // First, show the initial away message once
-        document.title = `${padTitle(initialAwayTitle, maxTitleLength)} ${awayEmojis[0]}`;
+          // Initial away title without emoji
+          document.title = initialAwayTitle;
         
-        // Wait 1 second before starting the looping "future is waiting" animation
-        setTimeout(() => {
-          titleInterval = setInterval(() => {
-            dotCount = (dotCount % 3) + 1;
-            emojiIndex = (emojiIndex + 1) % awayEmojis.length;
-            const dots = ".".repeat(dotCount) + "\u00A0".repeat(3 - dotCount); // keep emoji aligned
-            document.title = `${padTitle(awayBaseTitle, maxTitleLength)}${dots} ${awayEmojis[emojiIndex]}`;
-          }, 400);
-        }, 1000);
-      }
+          setTimeout(() => {
+            titleInterval = setInterval(() => {
+              dotCount = (dotCount % 3) + 1;
+              emojiIndex = (emojiIndex + 1) % awayEmojis.length;
+              const dots = ".".repeat(dotCount); // right after text
+              const titleWithDots = awayBaseTitle + dots;
+              document.title = padAfterDots(titleWithDots) + " " + awayEmojis[emojiIndex];
+            }, 400);
+          }, 1000);
+        }
     
       function stopAwayAnimation() {
         clearInterval(titleInterval);
@@ -58,10 +57,9 @@
         emojiIndex = 0;
     
         if (!isFirstVisit) {
-          // Show welcome back sequence only if not first visit
-          document.title = `${padTitle(welcomeBackTitle, maxTitleLength)} ${welcomeBackEmoji}`;
+          document.title = padAfterDots(welcomeBackTitle) + " " + welcomeBackEmoji;
           setTimeout(() => {
-            document.title = `${padTitle(createWithShaneTitle, maxTitleLength)} ${createWithShaneEmoji}`;
+            document.title = padAfterDots(createWithShaneTitle) + " " + createWithShaneEmoji;
           }, 2000);
           setTimeout(() => { document.title = normalTitle; }, 5000);
         } else {
@@ -80,8 +78,6 @@
       // Initialize title
       document.title = normalTitle;
     </script>
-
-
 
  
   <!-- Basic -->
@@ -796,6 +792,7 @@
 </body>
 
 </html>
+
 
 
 
