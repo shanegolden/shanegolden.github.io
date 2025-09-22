@@ -309,6 +309,55 @@
   </section>
   <!-- end review 4 section -->
 
+  <!-- review 5 section -->
+   <section id="review-3" class="about_section layout_padding">
+     <div class="container">
+       <div class="heading_container heading_center"></div>
+       <div class="row">
+         <div class="col-md-6">
+           <div class="img-box">
+             <img src="/images/r5-sheldan.png" alt="">
+           </div>
+         </div>
+         <div class="col-md-6">
+           <div class="detail-box">
+             <h3>
+               <a href="https://www.linkedin.com/in/sheldanmanansala" target="_blank" style="all: unset; cursor: pointer; color: inherit;">Sheldan Manansala</a>
+             </h3>
+             <h5>
+               Product Manager
+             </h5>
+   
+             <!-- Snippet shown by default -->
+             <p>I had the privilege of working with Shane during our time at Goldenstrike and Qoor. Shane consistently encouraged the team to challenge the status quo, make quick decisions, and pivot when necessary.</p>
+   
+             <!-- Hidden content until "Read more" is clicked -->
+             <div class="more-text" style="display: none;">
+               <p>His leadership created an environment where innovation thrived, and his ability to balance strategic vision with tactical execution made a lasting impact on the team's growth and success.</p>
+               <p>Shane's collaborative spirit and commitment to continuous improvement made him an invaluable partner and a true catalyst for positive change.</p>
+             </div>
+   
+             <!-- Read more toggle -->
+             <button onclick="toggleReview(this)" class="read-more-btn" style="border: none; background: none; color: #007bff; padding: 0; cursor: pointer;">Read more</button>
+           </div>
+         </div>
+       </div>
+     </div>
+   </section>
+   
+   <!-- Toggle script -->
+   <script>
+     function toggleReview(button) {
+       const moreText = button.previousElementSibling;
+       const isVisible = moreText.style.display === "block";
+   
+       moreText.style.display = isVisible ? "none" : "block";
+       button.textContent = isVisible ? "Read more" : "Show less";
+     }
+   </script>
+ 
+   <!-- end review 5 section -->
+
 
   <!-- info section -->
 
