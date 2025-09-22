@@ -4,37 +4,34 @@
 <head>
 
     <script>
-      // Titles
       const defaultTitle = "Shane Golden";
       const initialAwayTitle = "Wait, come back!";
       const awayBaseTitle = "The future is waiting";
-    
-      // Emojis for the away animation
       const awayEmojis = ["😐", "🫤", "😐", "🫠"];
-    
-      // Emojis for welcome back / create with Shane
       const welcomeBackEmoji = "😏";
       const createWithShaneEmoji = "🤯";
     
       let titleInterval;
       let dotCount = 0;
       let emojiIndex = 0;
+      const maxDots = 3; // Reserve space for max dots
     
-      // Total dot width reserved to align emoji (max 3 dots)
-      const maxDots = 3;
+      // Generate fixed-width dots string
+      function getDots(count) {
+        const dots = ".".repeat(count);
+        const padding = "\u00A0".repeat(maxDots - count); // pad remaining with non-breaking spaces
+        return dots + padding;
+      }
     
       function startAwayAnimation() {
-        // Show initial away title with no emoji
+        // Initial away title with no emoji
         document.title = initialAwayTitle;
     
         setTimeout(() => {
           titleInterval = setInterval(() => {
             dotCount = (dotCount + 1) % 4; // 0–3 dots
             emojiIndex = (emojiIndex + 1) % awayEmojis.length;
-    
-            // Create dots string and pad to maxDots with non-breaking spaces
-            const dots = ".".repeat(dotCount) + "\u00A0".repeat(maxDots - dotCount);
-            document.title = awayBaseTitle + dots + awayEmojis[emojiIndex];
+            document.title = awayBaseTitle + getDots(dotCount) + awayEmojis[emojiIndex];
           }, 400);
         }, 1000);
       }
@@ -42,12 +39,12 @@
       function showWelcomeBackSequence() {
         clearInterval(titleInterval);
     
-        // Show welcome back aligned with same emoji position
-        const spaceAfterText = "\u00A0".repeat(maxDots); // reserve same width as dots
-        document.title = `Welcome back!${spaceAfterText}${welcomeBackEmoji}`;
+        const fixedSpace = "\u00A0".repeat(maxDots); // Same reserved space as future dots
+    
+        document.title = `Welcome back!${fixedSpace}${welcomeBackEmoji}`;
     
         setTimeout(() => {
-          document.title = `Create with Shane${spaceAfterText}${createWithShaneEmoji}`;
+          document.title = `Create with Shane${fixedSpace}${createWithShaneEmoji}`;
         }, 2000);
     
         setTimeout(() => {
@@ -59,7 +56,6 @@
         if (document.hidden) {
           startAwayAnimation();
         } else {
-          // Only show welcome back sequence if not the first visit
           if (sessionStorage.getItem("visitedBefore")) {
             showWelcomeBackSequence();
           }
@@ -67,6 +63,7 @@
         }
       });
     </script>
+
 
 
  
@@ -782,6 +779,7 @@
 </body>
 
 </html>
+
 
 
 
