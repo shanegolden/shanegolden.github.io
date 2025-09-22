@@ -9,12 +9,16 @@
       const awayBaseTitle = "The future is waiting";
       const awayEmojis = ["😐", "🫤", "😐", "🫠"];
       const welcomeBackEmoji = "😏";
-      const createWithShaneEmoji = "🤯";
+      const createWithShaneEmoji = "☄️";
       
       let awayInterval = null;
       let dotCount = 0;
       let emojiIndex = 0;
       const maxDots = 3; // max dots for spacing
+      
+      // Track if user visited before
+      const visitedBefore = sessionStorage.getItem("visitedBefore") === "true";
+      sessionStorage.setItem("visitedBefore", "true");
       
       // Helper: fixed-width dots to keep emoji in place
       function getDots(count) {
@@ -37,7 +41,7 @@
       
       // Welcome back sequence
       function showWelcomeBackSequence() {
-        clearInterval(awayInterval);
+        clearInterval(awayInterval); // stop away animation
         const fixedSpace = "\u00A0".repeat(maxDots);
       
         document.title = `Welcome back!${fixedSpace}${welcomeBackEmoji}`;
@@ -51,21 +55,17 @@
         }, 5000);
       }
       
-      // Track if user visited before
-      const visitedBefore = sessionStorage.getItem("visitedBefore") === "true";
-      sessionStorage.setItem("visitedBefore", "true");
-      
       // Visibility change handler
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
-          // Start away animation only when leaving
+          // Only start away animation when leaving
           startAwayAnimation();
         } else {
-          // Show welcome back sequence only if user has visited before
+          // When coming back
           if (visitedBefore) {
             showWelcomeBackSequence();
           } else {
-            // First time visit: just show default title
+            // First-time visitors: just show default title
             document.title = defaultTitle;
           }
         }
@@ -74,6 +74,7 @@
       // Initialize title on page load
       document.title = defaultTitle;
       </script>
+
 
  
   <!-- Basic -->
@@ -788,6 +789,7 @@
 </body>
 
 </html>
+
 
 
 
