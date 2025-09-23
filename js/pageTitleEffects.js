@@ -1,4 +1,5 @@
-<script>
+// pageTitleEffects.js
+
   const defaultTitle = "Shane Golden";
   const initialAwayTitle = "Wait, come back!";
   const awayBaseTitle = "The future is waiting";
@@ -79,4 +80,3 @@
   
   // Initialize
   document.title = defaultTitle;
-</script>
