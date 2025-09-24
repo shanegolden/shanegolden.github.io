@@ -11,12 +11,17 @@
   <div id="pendingMembers"></div>
   <hr>
 
+  <!-- Book Submission Controls -->
+  <button id="openSubmissions">Open Book Submissions</button>
+  <button id="closeSubmissions">Close Book Submissions</button>
+  <hr>
+
   <!-- Voting Controls -->
   <button id="startVoting">Start Voting</button>
   <button id="closeVoting">Close Voting</button>
   <hr>
 
-  <!-- Add Book Submission Section -->
+  <!-- Add Book Submission Section (Optional Admin Adds Book Directly) -->
   <h2>Add Book Submission</h2>
   <input id="bookTitle" placeholder="Book Title" />
   <input id="bookAuthor" placeholder="Author Name" />
@@ -26,14 +31,12 @@
   <hr>
 
   <script type="module">
-    // Firebase Imports
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
     import { 
-      getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, serverTimestamp 
+      getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, serverTimestamp, setDoc 
     } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
       authDomain: "book-club-f42b1.firebaseapp.com",
@@ -48,12 +51,15 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    const configDoc = doc(db, "config", "settings"); // For submission/voting toggles
+
     // Protect page: admin only
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
         window.location.href = "login.html";
         return;
       }
+
       const memberSnap = await getDocs(collection(db, "members"));
       const admin = memberSnap.docs.find(d => d.id === user.uid && d.data().role === "admin");
       if (!admin) {
@@ -100,6 +106,28 @@
       });
     }
 
+    // Toggle Book Submission Period
+    document.getElementById("openSubmissions").addEventListener("click", async () => {
+      await setDoc(configDoc, { submissionsOpen: true }, { merge: true });
+      alert("Book submissions are now OPEN!");
+    });
+
+    document.getElementById("closeSubmissions").addEventListener("click", async () => {
+      await setDoc(configDoc, { submissionsOpen: false }, { merge: true });
+      alert("Book submissions are now CLOSED!");
+    });
+
+    // Voting toggles
+    document.getElementById("startVoting").addEventListener("click", async () => {
+      await setDoc(configDoc, { votingOpen: true }, { merge: true });
+      alert("Voting is now OPEN!");
+    });
+
+    document.getElementById("closeVoting").addEventListener("click", async () => {
+      await setDoc(configDoc, { votingOpen: false }, { merge: true });
+      alert("Voting is now CLOSED!");
+    });
+
     // Fetch book info from Open Library API by ISBN
     async function fetchBookInfo(isbn) {
       if (!isbn) return null;
@@ -120,7 +148,7 @@
       return null;
     }
 
-    // Add Book Submission
+    // Add Book Submission (admin directly adds book)
     document.getElementById("addBookBtn").addEventListener("click", async () => {
       const titleInput = document.getElementById("bookTitle").value.trim();
       const authorInput = document.getElementById("bookAuthor").value.trim();
@@ -130,7 +158,6 @@
       let author = authorInput;
       let coverUrl = "";
 
-      // If ISBN is provided, fetch real book info
       if (isbnInput) {
         const info = await fetchBookInfo(isbnInput);
         if (info) {
@@ -165,7 +192,6 @@
         document.getElementById("bookMessage").innerText = "Failed to add book. Check console for details.";
       }
     });
-
   </script>
 </body>
 </html>
