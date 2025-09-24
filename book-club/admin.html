@@ -21,7 +21,7 @@
   <button id="closeVoting">Close Voting</button>
   <hr>
 
-  <!-- Add Book Submission Section (Optional Admin Adds Book Directly) -->
+  <!-- Add Book Submission Section -->
   <h2>Add Book Submission</h2>
   <input id="bookTitle" placeholder="Book Title" />
   <input id="bookAuthor" placeholder="Author Name" />
@@ -51,7 +51,7 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    const configDoc = doc(db, "config", "settings"); // For submission/voting toggles
+    const configDoc = doc(db, "config", "settings"); // Stores submission/voting toggles
 
     // Protect page: admin only
     onAuthStateChanged(auth, async (user) => {
@@ -71,7 +71,7 @@
       }
     });
 
-    // Load pending members for approval
+    // Load pending members
     async function loadPendingMembers() {
       const membersSnap = await getDocs(collection(db, "members"));
       const pendingMembers = membersSnap.docs.filter(doc => !doc.data().approved && doc.data().role !== "admin");
@@ -106,7 +106,7 @@
       });
     }
 
-    // Toggle Book Submission Period
+    // Toggle submission period
     document.getElementById("openSubmissions").addEventListener("click", async () => {
       await setDoc(configDoc, { submissionsOpen: true }, { merge: true });
       alert("Book submissions are now OPEN!");
@@ -117,7 +117,7 @@
       alert("Book submissions are now CLOSED!");
     });
 
-    // Voting toggles
+    // Toggle voting period
     document.getElementById("startVoting").addEventListener("click", async () => {
       await setDoc(configDoc, { votingOpen: true }, { merge: true });
       alert("Voting is now OPEN!");
@@ -128,7 +128,7 @@
       alert("Voting is now CLOSED!");
     });
 
-    // Fetch book info from Open Library API by ISBN
+    // Fetch book info from Open Library API
     async function fetchBookInfo(isbn) {
       if (!isbn) return null;
       try {
@@ -148,7 +148,7 @@
       return null;
     }
 
-    // Add Book Submission (admin directly adds book)
+    // Admin adds book
     document.getElementById("addBookBtn").addEventListener("click", async () => {
       const titleInput = document.getElementById("bookTitle").value.trim();
       const authorInput = document.getElementById("bookAuthor").value.trim();
