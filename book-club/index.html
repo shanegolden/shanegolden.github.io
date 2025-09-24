@@ -52,7 +52,7 @@
       // 2️⃣ Add user to Firestore "members" with approved: false
       await addDoc(collection(db, "members"), {
         email: email,
-        approved: false
+        approved: true
       });
 
       document.getElementById("message").innerText =
