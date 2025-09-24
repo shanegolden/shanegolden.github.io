@@ -3,33 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <title>Admin - Book Club</title>
+  <style>
+    .member-card { border: 1px solid #ccc; padding: 10px; margin: 5px; }
+    .book-card { border: 1px dashed #666; padding: 8px; margin: 5px; display: flex; align-items: flex-start; gap: 10px; }
+    .book-card img { width: 60px; height: auto; }
+    .memberBooks { margin-left: 20px; }
+  </style>
 </head>
 <body>
   <h1>📚 Admin Panel</h1>
   <button id="logoutBtn">Log Out</button>
   <hr>
 
-  <!-- Pending Members -->
+  <!-- Pending Members Section -->
   <div id="pendingMembers"></div>
   <hr>
 
-  <!-- Submission Controls -->
-  <h2>Submission Period</h2>
-  <button id="startSubmissions">Start Book Submissions</button>
-  <button id="closeSubmissions">Close Book Submissions</button>
+  <!-- Submission Period Control -->
+  <button id="openSubmissionsBtn">Open Book Submissions</button>
+  <button id="closeSubmissionsBtn">Close Book Submissions</button>
   <p id="submissionStatus"></p>
   <hr>
 
-  <!-- Voting Controls -->
-  <button id="startVoting">Start Voting</button>
-  <button id="closeVoting">Close Voting</button>
-  <hr>
+  <!-- Members & Books -->
+  <h2>Members & Submissions</h2>
+  <div id="membersList"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
     import { 
-      getFirestore, collection, getDocs, addDoc, updateDoc, doc, onSnapshot, serverTimestamp, deleteDoc 
+      getFirestore, collection, getDocs, updateDoc, doc, deleteDoc, addDoc, serverTimestamp, onSnapshot 
     } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -46,41 +50,50 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Log Out Button
+    const pendingMembersDiv = document.getElementById("pendingMembers");
+    const membersListDiv = document.getElementById("membersList");
+    const submissionStatusP = document.getElementById("submissionStatus");
+    const openSubmissionsBtn = document.getElementById("openSubmissionsBtn");
+    const closeSubmissionsBtn = document.getElementById("closeSubmissionsBtn");
+
+    const adminUID = "sog7PT2TXTTqqXQFvG2j63blC6f1"; // Your admin UID
+
     document.getElementById("logoutBtn").addEventListener("click", async () => {
       await signOut(auth);
       window.location.href = "login.html";
     });
 
-    // Protect page: admin only
+    let currentPeriodDoc = null;
+
+    // Protect page
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
         window.location.href = "login.html";
         return;
       }
-      const membersSnap = await getDocs(collection(db, "members"));
-      const admin = membersSnap.docs.find(d => d.id === user.uid && d.data().role === "admin");
-      if (!admin) {
-        alert("Admin access only.");
+      if (user.uid !== adminUID) {
+        alert("Admin access only");
         await signOut(auth);
         window.location.href = "login.html";
-      } else {
-        loadPendingMembers();
-        listenSubmissionStatus();
-      }
-    });
-
-    // Pending members
-    async function loadPendingMembers() {
-      const membersSnap = await getDocs(collection(db, "members"));
-      const pending = membersSnap.docs.filter(d => !d.data().approved && d.data().role !== "admin");
-      const container = document.getElementById("pendingMembers");
-      container.innerHTML = "<h2>Pending Members</h2>";
-      if (!pending.length) {
-        container.innerHTML += "<p>No pending members.</p>";
         return;
       }
-      pending.forEach(docSnap => {
+      loadPendingMembers();
+      loadSubmissionPeriod();
+      loadMembersList();
+    });
+
+    // PENDING MEMBERS APPROVAL
+    async function loadPendingMembers() {
+      const membersSnap = await getDocs(collection(db, "members"));
+      const pendingMembers = membersSnap.docs.filter(d => !d.data().approved);
+      pendingMembersDiv.innerHTML = "<h2>Pending Members</h2>";
+
+      if (pendingMembers.length === 0) {
+        pendingMembersDiv.innerHTML += "<p>No pending members.</p>";
+        return;
+      }
+
+      pendingMembers.forEach(docSnap => {
         const data = docSnap.data();
         const div = document.createElement("div");
         div.innerHTML = `
@@ -89,7 +102,7 @@
           <button class="denyBtn">Deny</button>
           <hr>
         `;
-        container.appendChild(div);
+        pendingMembersDiv.appendChild(div);
 
         div.querySelector(".approveBtn").addEventListener("click", async () => {
           await updateDoc(doc(db, "members", docSnap.id), { approved: true });
@@ -103,30 +116,99 @@
       });
     }
 
-    // Submission period
-    const submissionStatusP = document.getElementById("submissionStatus");
-    const submissionPeriodsCol = collection(db, "submissionPeriods");
-
-    async function startSubmissions() {
-      await addDoc(submissionPeriodsCol, { open: true, createdAt: serverTimestamp() });
-    }
-    async function closeSubmissions() {
-      // Find current open period and close it
-      const snap = await getDocs(submissionPeriodsCol);
-      snap.docs.forEach(async d => { if (d.data().open) await updateDoc(doc(db, "submissionPeriods", d.id), { open: false }); });
+    // SUBMISSION PERIOD CONTROL
+    async function loadSubmissionPeriod() {
+      const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
+      const current = periodsSnap.docs.find(d => d.data().open);
+      currentPeriodDoc = current || null;
+      submissionStatusP.innerText = current ? "Submissions are OPEN" : "Submissions are CLOSED";
     }
 
-    document.getElementById("startSubmissions").addEventListener("click", startSubmissions);
-    document.getElementById("closeSubmissions").addEventListener("click", closeSubmissions);
+    openSubmissionsBtn.addEventListener("click", async () => {
+      if (currentPeriodDoc) {
+        await updateDoc(doc(db, "submissionPeriods", currentPeriodDoc.id), { open: true });
+      } else {
+        const newDoc = await addDoc(collection(db, "submissionPeriods"), { open: true, createdAt: serverTimestamp() });
+        currentPeriodDoc = await doc(db, "submissionPeriods", newDoc.id);
+      }
+      submissionStatusP.innerText = "Submissions are OPEN";
+    });
 
-    // Real-time update of submission status
-    function listenSubmissionStatus() {
-      onSnapshot(submissionPeriodsCol, snap => {
-        const openPeriod = snap.docs.find(d => d.data().open);
-        submissionStatusP.innerText = openPeriod ? "Submissions are OPEN" : "Submissions are CLOSED";
+    closeSubmissionsBtn.addEventListener("click", async () => {
+      if (currentPeriodDoc) {
+        await updateDoc(doc(db, "submissionPeriods", currentPeriodDoc.id), { open: false });
+        submissionStatusP.innerText = "Submissions are CLOSED";
+      }
+    });
+
+    // MEMBERS & SUBMISSIONS
+    async function loadMembersList() {
+      membersListDiv.innerHTML = "";
+      const membersSnap = await getDocs(collection(db, "members"));
+      const approvedMembers = membersSnap.docs.filter(d => d.data().approved);
+
+      approvedMembers.forEach(async memberDoc => {
+        const memberData = memberDoc.data();
+        const memberDiv = document.createElement("div");
+        memberDiv.classList.add("member-card");
+        memberDiv.innerHTML = `<b>${memberData.name}</b> (${memberData.email}) <button class="toggleBooksBtn">View Books</button>
+                               <div class="memberBooks" style="display:none;"></div>`;
+        membersListDiv.appendChild(memberDiv);
+
+        const toggleBtn = memberDiv.querySelector(".toggleBooksBtn");
+        const booksContainer = memberDiv.querySelector(".memberBooks");
+
+        toggleBtn.addEventListener("click", async () => {
+          if (booksContainer.style.display === "none") {
+            booksContainer.style.display = "block";
+            booksContainer.innerHTML = "Loading books...";
+            const booksSnap = await getDocs(collection(db, "books"));
+            const userBooks = booksSnap.docs.filter(b => b.data().submittedBy === memberDoc.id);
+            booksContainer.innerHTML = "";
+
+            if (userBooks.length === 0) booksContainer.innerHTML = "<p>No books submitted.</p>";
+
+            userBooks.forEach(bookDoc => {
+              const book = bookDoc.data();
+              const bookDiv = document.createElement("div");
+              bookDiv.classList.add("book-card");
+              bookDiv.innerHTML = `
+                <img src="${book.coverUrl}" alt="cover"/>
+                <div>
+                  <b>${book.title}</b> by ${book.author}<br/>
+                  <i>${book.description || ""}</i><br/>
+                  <button class="editBtn">Edit</button>
+                  <button class="deleteBtn">Delete</button>
+                </div>
+              `;
+              booksContainer.appendChild(bookDiv);
+
+              bookDiv.querySelector(".editBtn").addEventListener("click", async () => {
+                const newTitle = prompt("Edit book title:", book.title) || book.title;
+                const newAuthor = prompt("Edit author:", book.author) || book.author;
+                const newDescription = prompt("Edit description:", book.description || "") || "";
+                await updateDoc(doc(db, "books", bookDoc.id), {
+                  title: newTitle,
+                  author: newAuthor,
+                  description: newDescription
+                });
+                loadMembersList();
+              });
+
+              bookDiv.querySelector(".deleteBtn").addEventListener("click", async () => {
+                if (confirm(`Delete "${book.title}"?`)) {
+                  await deleteDoc(doc(db, "books", bookDoc.id));
+                  loadMembersList();
+                }
+              });
+            });
+
+          } else {
+            booksContainer.style.display = "none";
+          }
+        });
       });
     }
-
   </script>
 </body>
 </html>
