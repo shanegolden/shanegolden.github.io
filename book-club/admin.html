@@ -6,159 +6,166 @@
 </head>
 <body>
   <h1>📚 Admin Panel</h1>
+
+  <!-- Pending Members Section -->
   <div id="pendingMembers"></div>
+  <hr>
+
+  <!-- Voting Controls -->
   <button id="startVoting">Start Voting</button>
   <button id="closeVoting">Close Voting</button>
-  <h2>Add Book Submission</h2>
-    <input id="bookTitle" placeholder="Book Title" />
-    <input id="bookAuthor" placeholder="Author Name" />
-    <input id="bookISBN" placeholder="ISBN (optional)" />
-    <button id="addBookBtn">Add Book</button>
-    <div id="bookMessage"></div>
-    <hr>
+  <hr>
 
+  <!-- Add Book Submission Section -->
+  <h2>Add Book Submission</h2>
+  <input id="bookTitle" placeholder="Book Title" />
+  <input id="bookAuthor" placeholder="Author Name" />
+  <input id="bookISBN" placeholder="ISBN (optional)" />
+  <button id="addBookBtn">Add Book</button>
+  <div id="bookMessage"></div>
+  <hr>
 
   <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+    // Firebase Imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import { 
+      getFirestore, collection, getDocs, doc, updateDoc, deleteDoc, addDoc, serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
-  authDomain: "book-club-f42b1.firebaseapp.com",
-  projectId: "book-club-f42b1",
-  storageBucket: "book-club-f42b1.appspot.com",
-  messagingSenderId: "85630091573",
-  appId: "1:85630091573:web:427077f1351140fc278c7c",
-  measurementId: "G-8BD4H79Z5Q"
-};
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
+      authDomain: "book-club-f42b1.firebaseapp.com",
+      projectId: "book-club-f42b1",
+      storageBucket: "book-club-f42b1.appspot.com",
+      messagingSenderId: "85630091573",
+      appId: "1:85630091573:web:427077f1351140fc278c7c",
+      measurementId: "G-8BD4H79Z5Q"
+    };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-// Protect page: admin only
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    window.location.href = "login.html";
-    return;
-  }
-  const memberSnap = await getDocs(collection(db, "members"));
-  const admin = memberSnap.docs.find(d => d.id === user.uid && d.data().role === "admin");
-  if (!admin) {
-    alert("Admin access only.");
-    auth.signOut();
-    window.location.href = "login.html";
-  } else {
-    loadPendingMembers();
-  }
-});
-
-// Load members where approved = false
-async function loadPendingMembers() {
-  const membersSnap = await getDocs(collection(db, "members"));
-  const pendingMembers = membersSnap.docs.filter(doc => !doc.data().approved && doc.data().role !== "admin");
-  const container = document.getElementById("pendingMembers");
-  container.innerHTML = "<h2>Pending Members</h2>";
-
-  if (pendingMembers.length === 0) {
-    container.innerHTML += "<p>No pending members.</p>";
-    return;
-  }
-
-  pendingMembers.forEach(docSnap => {
-    const data = docSnap.data();
-    const div = document.createElement("div");
-    div.innerHTML = `
-      ${data.name} (${data.email})
-      <button class="approveBtn">Approve</button>
-      <button class="denyBtn">Deny</button>
-      <hr>
-    `;
-    container.appendChild(div);
-
-    div.querySelector(".approveBtn").addEventListener("click", async () => {
-      await updateDoc(doc(db, "members", docSnap.id), { approved: true });
-      div.remove();
+    // Protect page: admin only
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+      const memberSnap = await getDocs(collection(db, "members"));
+      const admin = memberSnap.docs.find(d => d.id === user.uid && d.data().role === "admin");
+      if (!admin) {
+        alert("Admin access only.");
+        auth.signOut();
+        window.location.href = "login.html";
+      } else {
+        loadPendingMembers();
+      }
     });
 
-    div.querySelector(".denyBtn").addEventListener("click", async () => {
-      await deleteDoc(doc(db, "members", docSnap.id));
-      div.remove();
-    });
-  });
-}
+    // Load pending members for approval
+    async function loadPendingMembers() {
+      const membersSnap = await getDocs(collection(db, "members"));
+      const pendingMembers = membersSnap.docs.filter(doc => !doc.data().approved && doc.data().role !== "admin");
+      const container = document.getElementById("pendingMembers");
+      container.innerHTML = "<h2>Pending Members</h2>";
 
-import { addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+      if (pendingMembers.length === 0) {
+        container.innerHTML += "<p>No pending members.</p>";
+        return;
+      }
 
-// Fetch book info from Open Library API by ISBN
-async function fetchBookInfo(isbn) {
-  if (!isbn) return null;
-  try {
-    const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
-    const data = await res.json();
-    const key = `ISBN:${isbn}`;
-    if (data[key]) {
-      return {
-        title: data[key].title || "",
-        author: data[key].authors?.[0]?.name || "",
-        coverUrl: data[key].cover?.medium || ""
-      };
+      pendingMembers.forEach(docSnap => {
+        const data = docSnap.data();
+        const div = document.createElement("div");
+        div.innerHTML = `
+          ${data.name || "(No name)"} (${data.email})
+          <button class="approveBtn">Approve</button>
+          <button class="denyBtn">Deny</button>
+          <hr>
+        `;
+        container.appendChild(div);
+
+        div.querySelector(".approveBtn").addEventListener("click", async () => {
+          await updateDoc(doc(db, "members", docSnap.id), { approved: true });
+          div.remove();
+        });
+
+        div.querySelector(".denyBtn").addEventListener("click", async () => {
+          await deleteDoc(doc(db, "members", docSnap.id));
+          div.remove();
+        });
+      });
     }
-  } catch (err) {
-    console.error("Error fetching book info:", err);
-  }
-  return null;
-}
 
-// Handle Add Book button click
-document.getElementById("addBookBtn").addEventListener("click", async () => {
-  const titleInput = document.getElementById("bookTitle").value.trim();
-  const authorInput = document.getElementById("bookAuthor").value.trim();
-  const isbnInput = document.getElementById("bookISBN").value.trim();
-
-  let title = titleInput;
-  let author = authorInput;
-  let coverUrl = "";
-
-  // If ISBN is provided, try fetching real info
-  if (isbnInput) {
-    const info = await fetchBookInfo(isbnInput);
-    if (info) {
-      title = info.title || title;
-      author = info.author || author;
-      coverUrl = info.coverUrl || "";
+    // Fetch book info from Open Library API by ISBN
+    async function fetchBookInfo(isbn) {
+      if (!isbn) return null;
+      try {
+        const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+        const data = await res.json();
+        const key = `ISBN:${isbn}`;
+        if (data[key]) {
+          return {
+            title: data[key].title || "",
+            author: data[key].authors?.[0]?.name || "",
+            coverUrl: data[key].cover?.medium || ""
+          };
+        }
+      } catch (err) {
+        console.error("Error fetching book info:", err);
+      }
+      return null;
     }
-  }
 
-  if (!title || !author) {
-    document.getElementById("bookMessage").innerText = "Title and author are required.";
-    return;
-  }
+    // Add Book Submission
+    document.getElementById("addBookBtn").addEventListener("click", async () => {
+      const titleInput = document.getElementById("bookTitle").value.trim();
+      const authorInput = document.getElementById("bookAuthor").value.trim();
+      const isbnInput = document.getElementById("bookISBN").value.trim();
 
-  try {
-    await addDoc(collection(db, "books"), {
-      title,
-      author,
-      submittedBy: auth.currentUser.uid,
-      coverUrl,
-      votes: 0,
-      active: false,
-      createdAt: serverTimestamp()
+      let title = titleInput;
+      let author = authorInput;
+      let coverUrl = "";
+
+      // If ISBN is provided, fetch real book info
+      if (isbnInput) {
+        const info = await fetchBookInfo(isbnInput);
+        if (info) {
+          title = info.title || title;
+          author = info.author || author;
+          coverUrl = info.coverUrl || "";
+        }
+      }
+
+      if (!title || !author) {
+        document.getElementById("bookMessage").innerText = "Title and author are required.";
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "books"), {
+          title,
+          author,
+          submittedBy: auth.currentUser.uid,
+          coverUrl,
+          votes: 0,
+          active: false,
+          createdAt: serverTimestamp()
+        });
+
+        document.getElementById("bookMessage").innerText = `Book "${title}" added successfully!`;
+        document.getElementById("bookTitle").value = "";
+        document.getElementById("bookAuthor").value = "";
+        document.getElementById("bookISBN").value = "";
+      } catch (err) {
+        console.error("Error adding book:", err);
+        document.getElementById("bookMessage").innerText = "Failed to add book. Check console for details.";
+      }
     });
 
-    document.getElementById("bookMessage").innerText = `Book "${title}" added successfully!`;
-    document.getElementById("bookTitle").value = "";
-    document.getElementById("bookAuthor").value = "";
-    document.getElementById("bookISBN").value = "";
-  } catch (err) {
-    console.error("Error adding book:", err);
-    document.getElementById("bookMessage").innerText = "Failed to add book. Check console for details.";
-  }
-});
-
-    
-</script>
-
+  </script>
 </body>
 </html>
