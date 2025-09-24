@@ -7,11 +7,11 @@
     .book-card { border: 1px solid #ccc; padding: 10px; margin: 5px; display: flex; align-items: flex-start; gap: 10px; }
     .book-card img { width: 80px; height: auto; }
     .alternative-card { border: 1px dashed #666; padding: 8px; margin: 5px; display: flex; align-items: flex-start; gap: 10px; }
-    .alternative-card button { height: 30px; align-self: center; }
+    .alternative-card button { height: 30px; margin-right: 5px; align-self: center; }
   </style>
 </head>
 <body>
-  <h1>📚 Book Club Dashboard</h1>
+  <h1>📚 Book Club Dashboard!</h1>
   <button id="logoutBtn">Log Out</button>
   <hr>
 
@@ -71,7 +71,6 @@
     const myBooksList = document.getElementById("myBooksList");
     const historyList = document.getElementById("historyList");
 
-    // Fetch book info and return top 3 matches
     async function fetchBookInfo(title, author, isbn) {
       try {
         if (isbn) {
@@ -103,7 +102,6 @@
       }
     }
 
-    // Real-time check of submission period
     const submissionPeriodsCol = collection(db, "submissionPeriods");
     onSnapshot(submissionPeriodsCol, snap => {
       const openPeriod = snap.docs.find(d => d.data().open);
@@ -113,7 +111,6 @@
       loadMyBooks();
     });
 
-    // Load user's submissions
     async function loadMyBooks() {
       myBooksList.innerHTML = "";
       historyList.innerHTML = "";
@@ -125,7 +122,6 @@
       const currentBooks = userBooks.filter(b => b.data().submissionPeriodID === currentPeriodId);
       const pastBooks = userBooks.filter(b => b.data().submissionPeriodID !== currentPeriodId);
 
-      // Current submission
       currentBooks.forEach(d => {
         const data = d.data();
         const div = document.createElement("div");
@@ -146,6 +142,7 @@
           alternativesContainer.innerHTML = "Loading alternatives...";
           const alternatives = await fetchBookInfo(data.title, data.author, "");
           alternativesContainer.innerHTML = "";
+
           alternatives.forEach((alt, idx) => {
             const altDiv = document.createElement("div");
             altDiv.classList.add("alternative-card");
@@ -155,11 +152,13 @@
                 <b>${alt.title}</b> by ${alt.author}<br/>
                 <i>${alt.description || ""}</i>
                 <br/>
-                <button>Select this match</button>
+                <button class="selectMatchBtn">Select this match</button>
+                <button class="selectCoverBtn">Select cover only</button>
               </div>
             `;
             alternativesContainer.appendChild(altDiv);
-            altDiv.querySelector("button").addEventListener("click", async () => {
+
+            altDiv.querySelector(".selectMatchBtn").addEventListener("click", async () => {
               await updateDoc(doc(db, "books", d.id), {
                 title: alt.title,
                 author: alt.author,
@@ -168,11 +167,17 @@
               });
               loadMyBooks();
             });
+
+            altDiv.querySelector(".selectCoverBtn").addEventListener("click", async () => {
+              await updateDoc(doc(db, "books", d.id), {
+                coverUrl: alt.coverUrl
+              });
+              loadMyBooks();
+            });
           });
         });
       });
 
-      // History
       pastBooks.forEach(d => {
         const data = d.data();
         const div = document.createElement("div");
@@ -188,7 +193,6 @@
       });
     }
 
-    // Submit book
     submitBookBtn.addEventListener("click", async () => {
       const title = document.getElementById("bookTitle").value.trim();
       const author = document.getElementById("bookAuthor").value.trim();
@@ -199,7 +203,6 @@
         return;
       }
 
-      // Check if user already submitted in this period
       const booksSnap = await getDocs(collection(db, "books"));
       const alreadySubmitted = booksSnap.docs.some(d =>
         d.data().submittedBy === currentUser.uid && d.data().submissionPeriodID === currentPeriodId
@@ -231,7 +234,6 @@
       loadMyBooks();
     });
 
-    // Auth listener
     onAuthStateChanged(auth, user => {
       if (!user) window.location.href = "login.html";
       else {
