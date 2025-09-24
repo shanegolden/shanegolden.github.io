@@ -26,7 +26,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
     import { 
-      getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp 
+      getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp, getDoc 
     } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -49,7 +49,6 @@
     let currentUser = null;
     let submissionsOpen = false;
 
-    // Protect page: logged-in members only
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
         window.location.href = "login.html";
@@ -59,140 +58,139 @@
 
       // Check submission status
       const configSnap = await getDoc(configDoc);
-      submissionsOpen = configSnap.data()?.submissionsOpen || false;
+      submissionsOpen = configSnap.exists() && configSnap.data().submissionsOpen;
 
-      // Load user's submission history
-      loadUserSubmissions();
+      loadUserBooks();
     });
 
-    // Fetch user's submissions
-    async function loadUserSubmissions() {
-      const q = query(submissionsRef, where("userId", "==", currentUser.uid));
-      const snap = await getDocs(q);
-      const container = document.getElementById("userBookHistory");
-      container.innerHTML = "";
-
-      let hasSubmitted = false;
-
-      snap.forEach(docSnap => {
-        const data = docSnap.data();
-        hasSubmitted = true;
-
-        const div = document.createElement("div");
-        div.innerHTML = `
-          <h3>${data.matchedTitle || data.title}</h3>
-          <p>${data.matchedAuthor || data.author}</p>
-          ${data.coverUrl ? `<img src="${data.coverUrl}" width="120"/>` : ""}
-          <p>${data.description || ""}</p>
-          ${submissionsOpen && !data.confirmed ? '<button class="editMatchBtn">Edit Match</button>' : ''}
-          <hr>
-        `;
-        container.appendChild(div);
-
-        div.querySelector(".editMatchBtn")?.addEventListener("click", async () => {
-          await editBookMatch(docSnap.id, data);
-        });
-      });
-
-      // Hide submission section if user already submitted or submissions closed
-      if (hasSubmitted || !submissionsOpen) {
-        document.getElementById("submissionSection").style.display = "none";
-      }
-    }
-
-    // Handle book submission
-    document.getElementById("submitBookBtn").addEventListener("click", async () => {
-      const title = document.getElementById("bookTitle").value.trim();
-      const author = document.getElementById("bookAuthor").value.trim();
-      const isbn = document.getElementById("bookISBN").value.trim();
-
-      if (!title || !author) {
-        document.getElementById("submissionMessage").innerText = "Title and author are required.";
-        return;
-      }
-
-      // Auto-match book info
-      let matchedTitle = title;
-      let matchedAuthor = author;
-      let coverUrl = "";
-      let description = "";
-
-      if (isbn) {
+    async function fetchBookInfo(isbn) {
+      if (!isbn) return null;
+      try {
         const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
         const data = await res.json();
         const key = `ISBN:${isbn}`;
         if (data[key]) {
-          matchedTitle = data[key].title || title;
-          matchedAuthor = data[key].authors?.[0]?.name || author;
-          coverUrl = data[key].cover?.medium || "";
-          description = data[key].notes || "";
+          return {
+            title: data[key].title || "",
+            author: data[key].authors?.[0]?.name || "",
+            coverUrl: data[key].cover?.medium || ""
+          };
         }
+      } catch (err) {
+        console.error("Error fetching book info:", err);
       }
+      return null;
+    }
 
-      await addDoc(submissionsRef, {
-        userId: currentUser.uid,
-        title,
-        author,
-        matchedTitle,
-        matchedAuthor,
-        coverUrl,
-        description,
-        confirmed: false,
-        createdAt: serverTimestamp()
-      });
-
-      document.getElementById("submissionMessage").innerText = "Book submitted! You can edit your match if needed.";
-      loadUserSubmissions();
-    });
-
-    // Edit match: fetch alternative matches from Open Library
-    async function editBookMatch(docId, oldData) {
-      const searchQuery = encodeURIComponent(oldData.title + " " + oldData.author);
-      const res = await fetch(`https://openlibrary.org/search.json?q=${searchQuery}&limit=5`);
-      const data = await res.json();
-
-      if (!data.docs || data.docs.length === 0) {
-        alert("No alternative matches found.");
+    // Submit book
+    document.getElementById("submitBookBtn").addEventListener("click", async () => {
+      if (!submissionsOpen) {
+        document.getElementById("submissionMessage").innerText = "Book submissions are currently closed.";
         return;
       }
 
-      let optionsHtml = "<h3>Select Correct Match:</h3>";
-      data.docs.forEach((book, idx) => {
-        const cover = book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : "";
-        optionsHtml += `
-          <div>
-            <input type="radio" name="matchOption" value="${idx}" id="opt${idx}">
-            <label for="opt${idx}">${book.title} - ${book.author_name?.[0] || "Unknown Author"}</label>
-            ${cover ? `<img src="${cover}" width="100"/>` : ""}
-          </div>
-        `;
-      });
-      optionsHtml += `<button id="confirmMatchBtn">Confirm Match</button>`;
+      // Check if user already submitted
+      const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid));
+      const existing = await getDocs(q);
+      if (!existing.empty) {
+        document.getElementById("submissionMessage").innerText = "You have already submitted a book.";
+        return;
+      }
 
-      const matchDiv = document.createElement("div");
-      matchDiv.innerHTML = optionsHtml;
-      document.body.appendChild(matchDiv);
+      const titleInput = document.getElementById("bookTitle").value.trim();
+      const authorInput = document.getElementById("bookAuthor").value.trim();
+      const isbnInput = document.getElementById("bookISBN").value.trim();
 
-      document.getElementById("confirmMatchBtn").addEventListener("click", async () => {
-        const selectedIdx = document.querySelector('input[name="matchOption"]:checked');
-        if (!selectedIdx) return alert("Please select a match.");
+      if (!titleInput || !authorInput) {
+        document.getElementById("submissionMessage").innerText = "Title and author are required.";
+        return;
+      }
 
-        const selectedBook = data.docs[selectedIdx.value];
-        const cover = selectedBook.cover_i ? `https://covers.openlibrary.org/b/id/${selectedBook.cover_i}-M.jpg` : "";
+      let title = titleInput;
+      let author = authorInput;
+      let coverUrl = "";
 
-        await updateDoc(doc(db, "submissions", docId), {
-          matchedTitle: selectedBook.title,
-          matchedAuthor: selectedBook.author_name?.[0] || "",
-          coverUrl: cover,
-          description: selectedBook.first_sentence?.[0] || "",
-          confirmed: true
+      if (isbnInput) {
+        const info = await fetchBookInfo(isbnInput);
+        if (info) {
+          title = info.title || title;
+          author = info.author || author;
+          coverUrl = info.coverUrl || "";
+        }
+      }
+
+      try {
+        await addDoc(collection(db, "books"), {
+          title,
+          author,
+          coverUrl,
+          submittedBy: currentUser.uid,
+          votes: 0,
+          active: false,
+          createdAt: serverTimestamp()
         });
 
-        matchDiv.remove();
-        loadUserSubmissions();
+        document.getElementById("submissionMessage").innerText = `Book "${title}" submitted successfully!`;
+        document.getElementById("bookTitle").value = "";
+        document.getElementById("bookAuthor").value = "";
+        document.getElementById("bookISBN").value = "";
+
+        loadUserBooks();
+      } catch (err) {
+        console.error(err);
+        document.getElementById("submissionMessage").innerText = "Failed to submit book.";
+      }
+    });
+
+    // Load user's submitted books
+    async function loadUserBooks() {
+      const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid));
+      const snapshot = await getDocs(q);
+      const container = document.getElementById("userBookHistory");
+      container.innerHTML = "";
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <img src="${data.coverUrl || ''}" alt="Cover" style="width:80px;height:auto;" />
+          <strong>${data.title}</strong> by ${data.author}
+          ${submissionsOpen ? `<button class="editBtn">Edit</button>` : ""}
+          <hr>
+        `;
+        container.appendChild(div);
+
+        // Edit button: fetch alternatives based on partial title/author search
+        if (submissionsOpen) {
+          div.querySelector(".editBtn").addEventListener("click", async () => {
+            const newTitle = prompt("Enter corrected title:", data.title);
+            const newAuthor = prompt("Enter corrected author:", data.author);
+            const newISBN = prompt("Enter ISBN (optional):", "");
+
+            let updatedTitle = newTitle || data.title;
+            let updatedAuthor = newAuthor || data.author;
+            let updatedCover = data.coverUrl || "";
+
+            if (newISBN) {
+              const info = await fetchBookInfo(newISBN);
+              if (info) {
+                updatedTitle = info.title || updatedTitle;
+                updatedAuthor = info.author || updatedAuthor;
+                updatedCover = info.coverUrl || updatedCover;
+              }
+            }
+
+            await updateDoc(doc(db, "books", docSnap.id), {
+              title: updatedTitle,
+              author: updatedAuthor,
+              coverUrl: updatedCover
+            });
+
+            loadUserBooks();
+          });
+        }
       });
     }
-
   </script>
 </body>
 </html>
