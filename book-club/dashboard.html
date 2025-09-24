@@ -26,7 +26,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
     import { 
-      getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp, getDoc 
+      getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp, onSnapshot, getDoc 
     } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -42,8 +42,6 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-
-    const submissionsRef = collection(db, "submissions");
     const configDoc = doc(db, "config", "settings");
 
     let currentUser = null;
@@ -56,11 +54,13 @@
       }
       currentUser = user;
 
-      // Check submission status
-      const configSnap = await getDoc(configDoc);
-      submissionsOpen = configSnap.exists() && configSnap.data().submissionsOpen;
-
-      loadUserBooks();
+      // Listen for live config changes
+      onSnapshot(configDoc, (snap) => {
+        const data = snap.exists() ? snap.data() : {};
+        submissionsOpen = data.submissionsOpen || false;
+        document.getElementById("submissionMessage").innerText = submissionsOpen ? "Book submissions are OPEN" : "Book submissions are CLOSED";
+        loadUserBooks();
+      });
     });
 
     async function fetchBookInfo(isbn) {
@@ -77,15 +77,14 @@
           };
         }
       } catch (err) {
-        console.error("Error fetching book info:", err);
+        console.error(err);
       }
       return null;
     }
 
-    // Submit book
     document.getElementById("submitBookBtn").addEventListener("click", async () => {
       if (!submissionsOpen) {
-        document.getElementById("submissionMessage").innerText = "Book submissions are currently closed.";
+        document.getElementById("submissionMessage").innerText = "Book submissions are closed.";
         return;
       }
 
@@ -142,7 +141,6 @@
       }
     });
 
-    // Load user's submitted books
     async function loadUserBooks() {
       const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid));
       const snapshot = await getDocs(q);
@@ -155,35 +153,34 @@
         div.innerHTML = `
           <img src="${data.coverUrl || ''}" alt="Cover" style="width:80px;height:auto;" />
           <strong>${data.title}</strong> by ${data.author}
-          ${submissionsOpen ? `<button class="editBtn">Edit</button>` : ""}
+          ${submissionsOpen ? `<input class="editTitle" value="${data.title}" placeholder="Edit title" />
+          <input class="editAuthor" value="${data.author}" placeholder="Edit author" />
+          <input class="editISBN" placeholder="Edit ISBN" />
+          <button class="saveEdit">Save</button>` : ""}
           <hr>
         `;
         container.appendChild(div);
 
-        // Edit button: fetch alternatives based on partial title/author search
         if (submissionsOpen) {
-          div.querySelector(".editBtn").addEventListener("click", async () => {
-            const newTitle = prompt("Enter corrected title:", data.title);
-            const newAuthor = prompt("Enter corrected author:", data.author);
-            const newISBN = prompt("Enter ISBN (optional):", "");
+          div.querySelector(".saveEdit").addEventListener("click", async () => {
+            let updatedTitle = div.querySelector(".editTitle").value.trim();
+            let updatedAuthor = div.querySelector(".editAuthor").value.trim();
+            let isbn = div.querySelector(".editISBN").value.trim();
+            let coverUrl = data.coverUrl;
 
-            let updatedTitle = newTitle || data.title;
-            let updatedAuthor = newAuthor || data.author;
-            let updatedCover = data.coverUrl || "";
-
-            if (newISBN) {
-              const info = await fetchBookInfo(newISBN);
+            if (isbn) {
+              const info = await fetchBookInfo(isbn);
               if (info) {
                 updatedTitle = info.title || updatedTitle;
                 updatedAuthor = info.author || updatedAuthor;
-                updatedCover = info.coverUrl || updatedCover;
+                coverUrl = info.coverUrl || coverUrl;
               }
             }
 
             await updateDoc(doc(db, "books", docSnap.id), {
               title: updatedTitle,
               author: updatedAuthor,
-              coverUrl: updatedCover
+              coverUrl
             });
 
             loadUserBooks();
@@ -191,6 +188,7 @@
         }
       });
     }
+
   </script>
 </body>
 </html>
