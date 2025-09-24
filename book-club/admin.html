@@ -4,30 +4,40 @@
   <meta charset="UTF-8">
   <title>Admin - Book Club</title>
   <style>
-    .period-card { border: 1px solid #ccc; margin: 10px 0; padding: 10px; }
-    .book-card { border: 1px solid #aaa; margin: 5px 0; padding: 5px; display: flex; gap: 10px; align-items: flex-start; }
-    .book-card img { width: 80px; height: auto; }
-    .edit-options { margin-top: 5px; display: flex; flex-direction: column; }
-    .edit-option { cursor: pointer; margin: 2px 0; padding: 2px; border: 1px solid #888; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { margin-top: 30px; }
+    .period { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; }
+    .book { display: flex; align-items: center; margin: 10px 0; }
+    .book img { width: 60px; height: auto; margin-right: 10px; }
+    .book-info { flex: 1; }
+    button { margin-left: 5px; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <h1>📚 Admin Panel</h1>
+  <button id="logoutBtn">Log Out</button>
 
-  <h2>Submission Periods</h2>
-  <div id="submissionPeriodsContainer"></div>
+  <!-- Pending Members Section -->
+  <div id="pendingMembers"></div>
   <hr>
 
+  <!-- Submission Period Controls -->
+  <h2>Submission Periods</h2>
+  <div id="periodsContainer"></div>
+  <button id="createPeriodBtn">Create New Submission Period</button>
+  <hr>
+
+  <!-- Add Book for Member -->
   <h2>Add Book for Member</h2>
-  <select id="selectMember"></select>
-  <select id="selectPeriod"></select>
+  <select id="memberSelect"><option>Loading members...</option></select><br><br>
   <input id="bookTitle" placeholder="Book Title">
   <input id="bookAuthor" placeholder="Author Name">
   <input id="bookISBN" placeholder="ISBN (optional)">
-  <button id="addBookForMemberBtn">Add Book for Member</button>
-  <div id="addBookMessage"></div>
-
-  <button id="logoutBtn">Log Out</button>
+  <select id="periodSelect"><option>Loading periods...</option></select>
+  <button id="addBookBtn">Add Book</button>
+  <div id="bookMessage"></div>
+  <hr>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
@@ -50,227 +60,219 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    let membersList = [];
-    let periodsList = [];
+    const adminUid = "sog7PT2TXTTqqXQFvG2j63blC6f1";
 
+    // Log out
     document.getElementById("logoutBtn").addEventListener("click", async () => {
       await signOut(auth);
       window.location.href = "login.html";
     });
 
-    // Protect admin page
-    onAuthStateChanged(auth, async user => {
-      if (!user) return window.location.href = "login.html";
-
-      const membersSnap = await getDocs(collection(db, "members"));
-      const admin = membersSnap.docs.find(d => d.id === user.uid && d.data().role === "admin");
-      if (!admin) {
+    // Admin Page Protection
+    onAuthStateChanged(auth, async (user) => {
+      if (!user || user.uid !== adminUid) {
         alert("Admin access only.");
-        auth.signOut();
+        signOut(auth);
         window.location.href = "login.html";
-      } else {
-        membersList = membersSnap.docs.filter(d => d.data().role !== "admin").map(d => ({ id: d.id, name: d.data().name }));
-        loadMembersDropdown();
-        loadPeriods();
+        return;
       }
+      loadPendingMembers();
+      loadMembersDropdown();
+      loadSubmissionPeriods();
     });
 
-    async function loadMembersDropdown() {
-      const select = document.getElementById("selectMember");
-      select.innerHTML = "<option value=''>Select Member</option>";
-      membersList.forEach(m => {
-        const opt = document.createElement("option");
-        opt.value = m.id;
-        opt.textContent = m.name;
-        select.appendChild(opt);
-      });
-    }
+    // ----------------- Pending Members -----------------
+    async function loadPendingMembers() {
+      const membersSnap = await getDocs(collection(db, "members"));
+      const pendingMembers = membersSnap.docs.filter(d => !d.data().approved && d.data().role !== "admin");
+      const container = document.getElementById("pendingMembers");
+      container.innerHTML = "<h2>Pending Members</h2>";
 
-    async function loadPeriods() {
-      const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
-      periodsList = periodsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const selectPeriod = document.getElementById("selectPeriod");
-      selectPeriod.innerHTML = "<option value=''>Select Period</option>";
-      periodsList.forEach(p => {
-        const opt = document.createElement("option");
-        opt.value = p.id;
-        opt.textContent = p.name || `Period ${p.id}`;
-        selectPeriod.appendChild(opt);
-      });
-
-      renderPeriodsList();
-    }
-
-    async function renderPeriodsList() {
-      const container = document.getElementById("submissionPeriodsContainer");
-      container.innerHTML = "";
-      for (const period of periodsList) {
-        const periodDiv = document.createElement("div");
-        periodDiv.classList.add("period-card");
-        periodDiv.innerHTML = `<strong>${period.name || "Unnamed Period"}</strong> - ${period.open ? "OPEN" : "CLOSED"} <button class="toggleBtn">${period.open ? "Close" : "Open"}</button>`;
-
-        const booksContainer = document.createElement("div");
-        booksContainer.style.display = "none";
-        periodDiv.appendChild(booksContainer);
-
-        periodDiv.querySelector(".toggleBtn").addEventListener("click", async () => {
-          await updateDoc(doc(db, "submissionPeriods", period.id), { open: !period.open });
-          period.open = !period.open;
-          renderPeriodsList();
-        });
-
-        periodDiv.addEventListener("click", async () => {
-          if (booksContainer.style.display === "none") {
-            booksContainer.style.display = "block";
-            await loadBooksForPeriod(period.id, booksContainer);
-          } else {
-            booksContainer.style.display = "none";
-          }
-        });
-
-        container.appendChild(periodDiv);
-      }
-    }
-
-    async function loadBooksForPeriod(periodId, container) {
-      container.innerHTML = "";
-      const booksQuery = query(collection(db, "books"), where("periodId", "==", periodId), orderBy("createdAt"));
-      const booksSnap = await getDocs(booksQuery);
-
-      if (booksSnap.empty) {
-        container.innerHTML = "<p>No submissions for this period.</p>";
+      if (pendingMembers.length === 0) {
+        container.innerHTML += "<p>No pending members.</p>";
         return;
       }
 
-      booksSnap.docs.forEach(async b => {
-        const data = b.data();
-        const memberName = membersList.find(m => m.id === data.submittedBy)?.name || data.submittedBy;
-
+      pendingMembers.forEach(docSnap => {
+        const data = docSnap.data();
         const div = document.createElement("div");
-        div.classList.add("book-card");
         div.innerHTML = `
-          <div>${data.coverUrl ? `<img src="${data.coverUrl}">` : ""}</div>
-          <div>
-            <strong>${data.title}</strong> by ${data.author}<br>
-            Submitted by: ${memberName}<br>
-            <button class="editBtn">Edit</button>
-            <button class="deleteBtn">Delete</button>
-          </div>
+          ${data.name || "(No name)"} (${data.email})
+          <button class="approveBtn">Approve</button>
+          <button class="denyBtn">Deny</button>
         `;
         container.appendChild(div);
 
-        div.querySelector(".deleteBtn").addEventListener("click", async () => {
-          await deleteDoc(doc(db, "books", b.id));
+        div.querySelector(".approveBtn").addEventListener("click", async () => {
+          await updateDoc(doc(db, "members", docSnap.id), { approved: true });
           div.remove();
         });
 
-        div.querySelector(".editBtn").addEventListener("click", () => {
-          showEditOptions(div, b);
+        div.querySelector(".denyBtn").addEventListener("click", async () => {
+          await deleteDoc(doc(db, "members", docSnap.id));
+          div.remove();
         });
       });
     }
 
-    // Edit options like dashboard
-    async function showEditOptions(div, bookDoc) {
-      const data = bookDoc.data();
-      const editDiv = document.createElement("div");
-      editDiv.classList.add("edit-options");
-      div.appendChild(editDiv);
-
-      const alternatives = [];
-      try {
-        const searchTitle = encodeURIComponent(data.title);
-        const res = await fetch(`https://openlibrary.org/search.json?title=${searchTitle}&limit=3`);
-        const result = await res.json();
-        if (result.docs?.length) {
-          result.docs.forEach(doc => {
-            alternatives.push({
-              title: doc.title,
-              author: doc.author_name?.[0] || "",
-              coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : "",
-              key: doc.key
-            });
-          });
+    // ----------------- Members Dropdown for Add Book -----------------
+    async function loadMembersDropdown() {
+      const memberSnap = await getDocs(collection(db, "members"));
+      const select = document.getElementById("memberSelect");
+      select.innerHTML = "";
+      memberSnap.docs.forEach(d => {
+        if (d.data().approved) {
+          const option = document.createElement("option");
+          option.value = d.id;
+          option.textContent = d.data().name || d.data().email;
+          select.appendChild(option);
         }
-      } catch (err) { console.error(err); }
-
-      function renderAlternatives(startIndex = 0) {
-        editDiv.innerHTML = "";
-        alternatives.slice(startIndex, startIndex + 3).forEach(match => {
-          const optDiv = document.createElement("div");
-          optDiv.classList.add("edit-option");
-          optDiv.innerHTML = `${match.coverUrl ? `<img src="${match.coverUrl}" style="width:50px;">` : ""} <strong>${match.title}</strong> by ${match.author}`;
-          optDiv.addEventListener("click", async () => {
-            await updateDoc(bookDoc.ref, {
-              title: match.title,
-              author: match.author,
-              coverUrl: match.coverUrl || "",
-            });
-            editDiv.remove();
-            renderPeriodsList();
-          });
-          editDiv.appendChild(optDiv);
-        });
-
-        if (alternatives.length > 3) {
-          const nextBtn = document.createElement("button");
-          nextBtn.textContent = "Next 3 Options";
-          nextBtn.addEventListener("click", () => renderAlternatives(3));
-          editDiv.appendChild(nextBtn);
-        }
-      }
-
-      renderAlternatives();
+      });
     }
 
-    // Add book for member
-    document.getElementById("addBookForMemberBtn").addEventListener("click", async () => {
-      const memberId = document.getElementById("selectMember").value;
-      const periodId = document.getElementById("selectPeriod").value;
-      const title = document.getElementById("bookTitle").value.trim();
-      const author = document.getElementById("bookAuthor").value.trim();
-      const isbn = document.getElementById("bookISBN").value.trim();
+    // ----------------- Submission Periods -----------------
+    async function loadSubmissionPeriods() {
+      const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
+      const container = document.getElementById("periodsContainer");
+      const periodSelect = document.getElementById("periodSelect");
+      container.innerHTML = "";
+      periodSelect.innerHTML = "";
 
-      if (!memberId || !periodId || !title || !author) {
-        return alert("Member, period, title, and author are required.");
-      }
+      periodsSnap.docs.sort((a,b) => a.data().start?.toMillis() - b.data().start?.toMillis());
 
-      let finalTitle = title;
-      let finalAuthor = author;
-      let coverUrl = "";
-      let description = "";
+      periodsSnap.docs.forEach(periodDoc => {
+        const period = periodDoc.data();
+        const startDate = period.start?.toDate().toLocaleString() || "Unknown start";
+        const endDate = period.end?.toDate().toLocaleString() || "Open";
 
-      if (isbn) {
-        try {
-          const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
-          const data = await res.json();
-          const key = `ISBN:${isbn}`;
-          if (data[key]) {
-            finalTitle = data[key].title || finalTitle;
-            finalAuthor = data[key].authors?.[0]?.name || finalAuthor;
-            coverUrl = data[key].cover?.medium || "";
-            description = "";
+        // Display period in admin list
+        const periodDiv = document.createElement("div");
+        periodDiv.className = "period";
+        periodDiv.innerHTML = `
+          <strong>${startDate} - ${endDate}</strong>
+          <button class="toggleBtn">${period.open ? "Close" : "Open"}</button>
+          <div class="booksContainer hidden"></div>
+        `;
+        container.appendChild(periodDiv);
+
+        // Add period to add book select
+        const opt = document.createElement("option");
+        opt.value = periodDoc.id;
+        opt.textContent = `${startDate} - ${endDate}`;
+        periodSelect.appendChild(opt);
+
+        // Toggle period open/close
+        periodDiv.querySelector(".toggleBtn").addEventListener("click", async () => {
+          await updateDoc(doc(db, "submissionPeriods", periodDoc.id), { open: !period.open });
+          loadSubmissionPeriods(); // Refresh
+        });
+
+        // Load books for this period
+        const booksContainer = periodDiv.querySelector(".booksContainer");
+        periodDiv.addEventListener("click", async () => {
+          booksContainer.classList.toggle("hidden");
+          if (!booksContainer.classList.contains("hidden")) {
+            booksContainer.innerHTML = "";
+            const booksQuery = query(
+              collection(db, "books"),
+              where("periodId","==", periodDoc.id),
+              orderBy("createdAt")
+            );
+            const booksSnap = await getDocs(booksQuery);
+            booksSnap.docs.forEach(bookDoc => {
+              const b = bookDoc.data();
+              const div = document.createElement("div");
+              div.className = "book";
+              div.innerHTML = `
+                <img src="${b.coverUrl || ''}" alt="Cover">
+                <div class="book-info">
+                  <strong>${b.title}</strong> by ${b.author} <br>
+                  Submitted by: ${b.submittedByName || "Unknown"}
+                </div>
+                <button class="editBookBtn">Edit</button>
+                <button class="deleteBookBtn">Delete</button>
+              `;
+              booksContainer.appendChild(div);
+
+              // Edit Book (placeholder, implement match editor)
+              div.querySelector(".editBookBtn").addEventListener("click", () => {
+                alert("Edit book feature goes here (match editor with cover selection).");
+              });
+
+              // Delete Book
+              div.querySelector(".deleteBookBtn").addEventListener("click", async () => {
+                await deleteDoc(doc(db, "books", bookDoc.id));
+                div.remove();
+              });
+            });
           }
-        } catch (err) { console.error(err); }
+        });
+      });
+    }
+
+    // ----------------- Add Book for Member -----------------
+    document.getElementById("addBookBtn").addEventListener("click", async () => {
+      const memberId = document.getElementById("memberSelect").value;
+      const periodId = document.getElementById("periodSelect").value;
+      const titleInput = document.getElementById("bookTitle").value.trim();
+      const authorInput = document.getElementById("bookAuthor").value.trim();
+      const isbnInput = document.getElementById("bookISBN").value.trim();
+
+      if (!titleInput || !authorInput || !memberId || !periodId) {
+        document.getElementById("bookMessage").innerText = "All fields are required.";
+        return;
       }
 
-      await addDoc(collection(db, "books"), {
-        title: finalTitle,
-        author: finalAuthor,
-        coverUrl,
-        description,
-        submittedBy: memberId,
-        periodId,
-        votes: 0,
-        active: false,
-        createdAt: serverTimestamp()
-      });
+      // Fetch book info from Open Library
+      let title = titleInput;
+      let author = authorInput;
+      let coverUrl = "";
+      if (isbnInput) {
+        try {
+          const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbnInput}&format=json&jscmd=data`);
+          const data = await res.json();
+          const key = `ISBN:${isbnInput}`;
+          if (data[key]) {
+            title = data[key].title || title;
+            author = data[key].authors?.[0]?.name || author;
+            coverUrl = data[key].cover?.medium || "";
+          }
+        } catch (err) {
+          console.error("Error fetching book info:", err);
+        }
+      }
 
-      document.getElementById("addBookMessage").innerText = `Book "${finalTitle}" added for member successfully!`;
-      document.getElementById("bookTitle").value = "";
-      document.getElementById("bookAuthor").value = "";
-      document.getElementById("bookISBN").value = "";
-      renderPeriodsList();
+      try {
+        await addDoc(collection(db, "books"), {
+          title,
+          author,
+          coverUrl,
+          periodId,
+          submittedBy: memberId,
+          submittedByName: document.getElementById("memberSelect").selectedOptions[0].textContent,
+          votes: 0,
+          active: false,
+          createdAt: serverTimestamp()
+        });
+        document.getElementById("bookMessage").innerText = `Book "${title}" added successfully for member.`;
+        document.getElementById("bookTitle").value = "";
+        document.getElementById("bookAuthor").value = "";
+        document.getElementById("bookISBN").value = "";
+      } catch (err) {
+        console.error("Error adding book:", err);
+        document.getElementById("bookMessage").innerText = "Failed to add book. Check console.";
+      }
+    });
+
+    // ----------------- Create New Submission Period -----------------
+    document.getElementById("createPeriodBtn").addEventListener("click", async () => {
+      const now = new Date();
+      const periodDoc = await addDoc(collection(db, "submissionPeriods"), {
+        open: true,
+        start: serverTimestamp(),
+        end: null
+      });
+      loadSubmissionPeriods();
     });
 
   </script>
