@@ -2,31 +2,41 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Book Club Dashboard</title>
 </head>
 <body>
   <h1>📚 Book Club Dashboard</h1>
+  <button id="logoutBtn">Log Out</button>
+  <hr>
 
-  <!-- Book Submission Section -->
-  <div id="submissionSection">
+  <p id="submissionStatus"></p>
+
+  <div id="bookSubmissionArea">
     <h2>Submit Your Book</h2>
     <input id="bookTitle" placeholder="Book Title" />
     <input id="bookAuthor" placeholder="Author Name" />
     <input id="bookISBN" placeholder="ISBN (optional)" />
     <button id="submitBookBtn">Submit Book</button>
-    <div id="submissionMessage"></div>
+    <p id="submissionMessage"></p>
+  </div>
+  <hr>
+
+  <div id="myBooksArea">
+    <h2>My Submissions</h2>
+    <div id="myBooksList"></div>
   </div>
 
-  <!-- Submitted Book History -->
-  <h2>Your Submissions</h2>
-  <div id="userBookHistory"></div>
+  <hr>
+  <div id="historyArea">
+    <h2>Submission History</h2>
+    <div id="historyList"></div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
     import { 
-      getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp, onSnapshot, getDoc 
+      getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, getDocs, serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -42,153 +52,167 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const configDoc = doc(db, "config", "settings");
 
-    let currentUser = null;
-    let submissionsOpen = false;
-
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        window.location.href = "login.html";
-        return;
-      }
-      currentUser = user;
-
-      // Listen for live config changes
-      onSnapshot(configDoc, (snap) => {
-        const data = snap.exists() ? snap.data() : {};
-        submissionsOpen = data.submissionsOpen || false;
-        document.getElementById("submissionMessage").innerText = submissionsOpen ? "Book submissions are OPEN" : "Book submissions are CLOSED";
-        loadUserBooks();
-      });
+    // Logout
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "login.html";
     });
 
-    async function fetchBookInfo(isbn) {
-      if (!isbn) return null;
-      try {
-        const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+    let currentUser = null;
+    let currentPeriodId = null;
+
+    const submissionStatusP = document.getElementById("submissionStatus");
+    const submitBookBtn = document.getElementById("submitBookBtn");
+    const submissionMessage = document.getElementById("submissionMessage");
+    const myBooksList = document.getElementById("myBooksList");
+    const historyList = document.getElementById("historyList");
+
+    // Fetch book info from Open Library API
+    async function fetchBookInfo(title, author, isbn) {
+      let url = "";
+      if (isbn) {
+        url = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`;
+        const res = await fetch(url);
         const data = await res.json();
         const key = `ISBN:${isbn}`;
         if (data[key]) {
           return {
-            title: data[key].title || "",
-            author: data[key].authors?.[0]?.name || "",
-            coverUrl: data[key].cover?.medium || ""
+            title: data[key].title || title,
+            author: data[key].authors?.[0]?.name || author,
+            coverUrl: data[key].cover?.medium || "",
+            description: data[key].notes || ""
           };
         }
-      } catch (err) {
-        console.error(err);
       }
-      return null;
+      // If no ISBN or not found, try Open Library Search
+      url = `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=5`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.docs && data.docs.length > 0) {
+        const doc = data.docs[0];
+        return {
+          title: doc.title || title,
+          author: doc.author_name?.[0] || author,
+          coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : "",
+          description: doc.first_sentence?.[0] || ""
+        };
+      }
+      return { title, author, coverUrl: "", description: "" };
     }
 
-    document.getElementById("submitBookBtn").addEventListener("click", async () => {
-      if (!submissionsOpen) {
-        document.getElementById("submissionMessage").innerText = "Book submissions are closed.";
-        return;
-      }
-
-      // Check if user already submitted
-      const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid));
-      const existing = await getDocs(q);
-      if (!existing.empty) {
-        document.getElementById("submissionMessage").innerText = "You have already submitted a book.";
-        return;
-      }
-
-      const titleInput = document.getElementById("bookTitle").value.trim();
-      const authorInput = document.getElementById("bookAuthor").value.trim();
-      const isbnInput = document.getElementById("bookISBN").value.trim();
-
-      if (!titleInput || !authorInput) {
-        document.getElementById("submissionMessage").innerText = "Title and author are required.";
-        return;
-      }
-
-      let title = titleInput;
-      let author = authorInput;
-      let coverUrl = "";
-
-      if (isbnInput) {
-        const info = await fetchBookInfo(isbnInput);
-        if (info) {
-          title = info.title || title;
-          author = info.author || author;
-          coverUrl = info.coverUrl || "";
-        }
-      }
-
-      try {
-        await addDoc(collection(db, "books"), {
-          title,
-          author,
-          coverUrl,
-          submittedBy: currentUser.uid,
-          votes: 0,
-          active: false,
-          createdAt: serverTimestamp()
-        });
-
-        document.getElementById("submissionMessage").innerText = `Book "${title}" submitted successfully!`;
-        document.getElementById("bookTitle").value = "";
-        document.getElementById("bookAuthor").value = "";
-        document.getElementById("bookISBN").value = "";
-
-        loadUserBooks();
-      } catch (err) {
-        console.error(err);
-        document.getElementById("submissionMessage").innerText = "Failed to submit book.";
-      }
+    // Real-time check of submission period
+    const submissionPeriodsCol = collection(db, "submissionPeriods");
+    onSnapshot(submissionPeriodsCol, snap => {
+      const openPeriod = snap.docs.find(d => d.data().open);
+      currentPeriodId = openPeriod ? openPeriod.id : null;
+      submissionStatusP.innerText = openPeriod ? "Book submissions are OPEN" : "Book submissions are CLOSED";
+      submitBookBtn.disabled = !openPeriod;
+      loadMyBooks();
     });
 
-    async function loadUserBooks() {
-      const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid));
-      const snapshot = await getDocs(q);
-      const container = document.getElementById("userBookHistory");
-      container.innerHTML = "";
+    // Load user's submissions for current period
+    async function loadMyBooks() {
+      myBooksList.innerHTML = "";
+      historyList.innerHTML = "";
 
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
+      if (!currentUser) return;
+
+      const booksSnap = await getDocs(collection(db, "books"));
+      const userBooks = booksSnap.docs.filter(d => d.data().submittedBy === currentUser.uid);
+      const currentBooks = userBooks.filter(b => b.data().submissionPeriodID === currentPeriodId);
+      const pastBooks = userBooks.filter(b => b.data().submissionPeriodID !== currentPeriodId);
+
+      // Current submission
+      currentBooks.forEach(d => {
+        const data = d.data();
         const div = document.createElement("div");
         div.innerHTML = `
-          <img src="${data.coverUrl || ''}" alt="Cover" style="width:80px;height:auto;" />
-          <strong>${data.title}</strong> by ${data.author}
-          ${submissionsOpen ? `<input class="editTitle" value="${data.title}" placeholder="Edit title" />
-          <input class="editAuthor" value="${data.author}" placeholder="Edit author" />
-          <input class="editISBN" placeholder="Edit ISBN" />
-          <button class="saveEdit">Save</button>` : ""}
-          <hr>
+          <img src="${data.coverUrl}" alt="cover" width="80"/>
+          <b>${data.title}</b> by ${data.author}<br/>
+          <i>${data.description || ""}</i><br/>
+          <button class="editBtn">Edit Match</button>
         `;
-        container.appendChild(div);
+        myBooksList.appendChild(div);
 
-        if (submissionsOpen) {
-          div.querySelector(".saveEdit").addEventListener("click", async () => {
-            let updatedTitle = div.querySelector(".editTitle").value.trim();
-            let updatedAuthor = div.querySelector(".editAuthor").value.trim();
-            let isbn = div.querySelector(".editISBN").value.trim();
-            let coverUrl = data.coverUrl;
-
-            if (isbn) {
-              const info = await fetchBookInfo(isbn);
-              if (info) {
-                updatedTitle = info.title || updatedTitle;
-                updatedAuthor = info.author || updatedAuthor;
-                coverUrl = info.coverUrl || coverUrl;
-              }
-            }
-
-            await updateDoc(doc(db, "books", docSnap.id), {
-              title: updatedTitle,
-              author: updatedAuthor,
-              coverUrl
-            });
-
-            loadUserBooks();
+        div.querySelector(".editBtn").addEventListener("click", async () => {
+          const newTitle = prompt("Enter title to search alternatives:", data.title);
+          if (!newTitle) return;
+          const altMatch = await fetchBookInfo(newTitle, data.author, "");
+          await updateDoc(doc(db, "books", d.id), {
+            title: altMatch.title,
+            author: altMatch.author,
+            coverUrl: altMatch.coverUrl,
+            description: altMatch.description
           });
-        }
+          loadMyBooks();
+        });
+      });
+
+      // History
+      pastBooks.forEach(d => {
+        const data = d.data();
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <img src="${data.coverUrl}" alt="cover" width="80"/>
+          <b>${data.title}</b> by ${data.author}<br/>
+          <i>${data.description || ""}</i>
+        `;
+        historyList.appendChild(div);
       });
     }
 
+    // Submit book
+    submitBookBtn.addEventListener("click", async () => {
+      const title = document.getElementById("bookTitle").value.trim();
+      const author = document.getElementById("bookAuthor").value.trim();
+      const isbn = document.getElementById("bookISBN").value.trim();
+
+      if (!title || !author) {
+        submissionMessage.innerText = "Title and author required.";
+        return;
+      }
+
+      // Check if user already submitted in this period
+      const booksSnap = await getDocs(collection(db, "books"));
+      const alreadySubmitted = booksSnap.docs.some(d =>
+        d.data().submittedBy === currentUser.uid && d.data().submissionPeriodID === currentPeriodId
+      );
+      if (alreadySubmitted) {
+        submissionMessage.innerText = "You already submitted a book this period.";
+        return;
+      }
+
+      const match = await fetchBookInfo(title, author, isbn);
+
+      await addDoc(collection(db, "books"), {
+        title: match.title,
+        author: match.author,
+        coverUrl: match.coverUrl,
+        description: match.description,
+        submittedBy: currentUser.uid,
+        submissionPeriodID: currentPeriodId,
+        votes: 0,
+        active: false,
+        createdAt: serverTimestamp()
+      });
+
+      submissionMessage.innerText = `Book "${match.title}" submitted!`;
+      document.getElementById("bookTitle").value = "";
+      document.getElementById("bookAuthor").value = "";
+      document.getElementById("bookISBN").value = "";
+      loadMyBooks();
+    });
+
+    // Auth listener
+    onAuthStateChanged(auth, user => {
+      if (!user) {
+        window.location.href = "login.html";
+      } else {
+        currentUser = user;
+        loadMyBooks();
+      }
+    });
   </script>
 </body>
 </html>
