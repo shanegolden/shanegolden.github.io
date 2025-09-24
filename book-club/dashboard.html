@@ -68,37 +68,36 @@
     const myBooksList = document.getElementById("myBooksList");
     const historyList = document.getElementById("historyList");
 
-    // Fetch book info from Open Library API
+    // Fetch book info and return top 3 matches
     async function fetchBookInfo(title, author, isbn) {
-      let url = "";
-      if (isbn) {
-        url = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const key = `ISBN:${isbn}`;
-        if (data[key]) {
-          return {
-            title: data[key].title || title,
-            author: data[key].authors?.[0]?.name || author,
-            coverUrl: data[key].cover?.medium || "",
-            description: data[key].notes || ""
-          };
+      try {
+        if (isbn) {
+          const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+          const data = await res.json();
+          const key = `ISBN:${isbn}`;
+          if (data[key]) {
+            return [{
+              title: data[key].title || title,
+              author: data[key].authors?.[0]?.name || author,
+              coverUrl: data[key].cover?.medium || "",
+              description: data[key].notes || ""
+            }];
+          }
         }
-      }
-      // If no ISBN or not found, try Open Library Search
-      url = `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=5`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.docs && data.docs.length > 0) {
-        const doc = data.docs[0];
-        return {
+
+        const searchRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=5`);
+        const searchData = await searchRes.json();
+        if (!searchData.docs || searchData.docs.length === 0) return [{ title, author, coverUrl: "", description: "" }];
+        return searchData.docs.slice(0,3).map(doc => ({
           title: doc.title || title,
           author: doc.author_name?.[0] || author,
           coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : "",
           description: doc.first_sentence?.[0] || ""
-        };
+        }));
+      } catch (err) {
+        console.error("Error fetching book info:", err);
+        return [{ title, author, coverUrl: "", description: "" }];
       }
-      return { title, author, coverUrl: "", description: "" };
     }
 
     // Real-time check of submission period
@@ -136,14 +135,16 @@
         myBooksList.appendChild(div);
 
         div.querySelector(".editBtn").addEventListener("click", async () => {
-          const newTitle = prompt("Enter title to search alternatives:", data.title);
-          if (!newTitle) return;
-          const altMatch = await fetchBookInfo(newTitle, data.author, "");
+          const alternatives = await fetchBookInfo(data.title, data.author, "");
+          const altTitles = alternatives.map((m,i)=>`${i+1}: ${m.title} by ${m.author}`).join("\n");
+          const choice = prompt(`Select correct match:\n${altTitles}\nEnter 1, 2, or 3:`);
+          const selected = alternatives[parseInt(choice)-1];
+          if (!selected) return;
           await updateDoc(doc(db, "books", d.id), {
-            title: altMatch.title,
-            author: altMatch.author,
-            coverUrl: altMatch.coverUrl,
-            description: altMatch.description
+            title: selected.title,
+            author: selected.author,
+            coverUrl: selected.coverUrl,
+            description: selected.description
           });
           loadMyBooks();
         });
@@ -183,7 +184,8 @@
         return;
       }
 
-      const match = await fetchBookInfo(title, author, isbn);
+      const matches = await fetchBookInfo(title, author, isbn);
+      const match = matches[0]; // default match
 
       await addDoc(collection(db, "books"), {
         title: match.title,
