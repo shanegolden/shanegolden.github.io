@@ -8,5 +8,46 @@
 <body>
   <h1>📚 Welcome to Our Book Club</h1>
   <div id="app"></div>
+
+<script type="module">
+  // Firebase SDKs
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
+    authDomain: "book-club-f42b1.firebaseapp.com",
+    projectId: "book-club-f42b1",
+    storageBucket: "book-club-f42b1.firebasestorage.app",
+    messagingSenderId: "85630091573",
+    appId: "1:85630091573:web:427077f1351140fc278c7c",
+    measurementId: "G-8BD4H79Z5Q"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  document.getElementById("app").innerHTML = `
+    <h2>Sign Up</h2>
+    <input id="email" placeholder="Email" />
+    <input id="password" placeholder="Password" type="password" />
+    <button id="signup">Sign Up</button>
+  `;
+
+  document.getElementById("signup").addEventListener("click", async () => {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      alert("Signup success!");
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+</script>
+
+  
 </body>
 </html>
