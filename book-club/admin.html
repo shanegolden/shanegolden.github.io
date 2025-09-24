@@ -9,7 +9,14 @@
   <div id="pendingMembers"></div>
   <button id="startVoting">Start Voting</button>
   <button id="closeVoting">Close Voting</button>
-  <div id="bookSubmissions"></div>
+  <h2>Add Book Submission</h2>
+    <input id="bookTitle" placeholder="Book Title" />
+    <input id="bookAuthor" placeholder="Author Name" />
+    <input id="bookISBN" placeholder="ISBN (optional)" />
+    <button id="addBookBtn">Add Book</button>
+    <div id="bookMessage"></div>
+    <hr>
+
 
   <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
