@@ -2,27 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Book Club Dashboard</title>
 </head>
 <body>
   <h1>📚 Book Club Dashboard</h1>
-  <div id="app">
-    <h2>Voting Board</h2>
-    <div id="booksList"></div>
 
-    <h2>Past Winners</h2>
-    <div id="historyList"></div>
-
-    <h2>Live Chat</h2>
-    <div id="chatBox"></div>
-    <input id="chatInput" placeholder="Type a message..." />
-    <button id="chatSend">Send</button>
+  <!-- Book Submission Section -->
+  <div id="submissionSection">
+    <h2>Submit Your Book</h2>
+    <input id="bookTitle" placeholder="Book Title" />
+    <input id="bookAuthor" placeholder="Author Name" />
+    <input id="bookISBN" placeholder="ISBN (optional)" />
+    <button id="submitBookBtn">Submit Book</button>
+    <div id="submissionMessage"></div>
   </div>
+
+  <!-- Submitted Book History -->
+  <h2>Your Submissions</h2>
+  <div id="userBookHistory"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+    import { 
+      getFirestore, collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -38,11 +43,156 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Protect page: only approved members
+    const submissionsRef = collection(db, "submissions");
+    const configDoc = doc(db, "config", "settings");
+
+    let currentUser = null;
+    let submissionsOpen = false;
+
+    // Protect page: logged-in members only
     onAuthStateChanged(auth, async (user) => {
-      if (!user) window.location.href = "login.html";
-      // TODO: check Firestore approved field here (we’ll add in next step)
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+      currentUser = user;
+
+      // Check submission status
+      const configSnap = await getDoc(configDoc);
+      submissionsOpen = configSnap.data()?.submissionsOpen || false;
+
+      // Load user's submission history
+      loadUserSubmissions();
     });
+
+    // Fetch user's submissions
+    async function loadUserSubmissions() {
+      const q = query(submissionsRef, where("userId", "==", currentUser.uid));
+      const snap = await getDocs(q);
+      const container = document.getElementById("userBookHistory");
+      container.innerHTML = "";
+
+      let hasSubmitted = false;
+
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        hasSubmitted = true;
+
+        const div = document.createElement("div");
+        div.innerHTML = `
+          <h3>${data.matchedTitle || data.title}</h3>
+          <p>${data.matchedAuthor || data.author}</p>
+          ${data.coverUrl ? `<img src="${data.coverUrl}" width="120"/>` : ""}
+          <p>${data.description || ""}</p>
+          ${submissionsOpen && !data.confirmed ? '<button class="editMatchBtn">Edit Match</button>' : ''}
+          <hr>
+        `;
+        container.appendChild(div);
+
+        div.querySelector(".editMatchBtn")?.addEventListener("click", async () => {
+          await editBookMatch(docSnap.id, data);
+        });
+      });
+
+      // Hide submission section if user already submitted or submissions closed
+      if (hasSubmitted || !submissionsOpen) {
+        document.getElementById("submissionSection").style.display = "none";
+      }
+    }
+
+    // Handle book submission
+    document.getElementById("submitBookBtn").addEventListener("click", async () => {
+      const title = document.getElementById("bookTitle").value.trim();
+      const author = document.getElementById("bookAuthor").value.trim();
+      const isbn = document.getElementById("bookISBN").value.trim();
+
+      if (!title || !author) {
+        document.getElementById("submissionMessage").innerText = "Title and author are required.";
+        return;
+      }
+
+      // Auto-match book info
+      let matchedTitle = title;
+      let matchedAuthor = author;
+      let coverUrl = "";
+      let description = "";
+
+      if (isbn) {
+        const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+        const data = await res.json();
+        const key = `ISBN:${isbn}`;
+        if (data[key]) {
+          matchedTitle = data[key].title || title;
+          matchedAuthor = data[key].authors?.[0]?.name || author;
+          coverUrl = data[key].cover?.medium || "";
+          description = data[key].notes || "";
+        }
+      }
+
+      await addDoc(submissionsRef, {
+        userId: currentUser.uid,
+        title,
+        author,
+        matchedTitle,
+        matchedAuthor,
+        coverUrl,
+        description,
+        confirmed: false,
+        createdAt: serverTimestamp()
+      });
+
+      document.getElementById("submissionMessage").innerText = "Book submitted! You can edit your match if needed.";
+      loadUserSubmissions();
+    });
+
+    // Edit match: fetch alternative matches from Open Library
+    async function editBookMatch(docId, oldData) {
+      const searchQuery = encodeURIComponent(oldData.title + " " + oldData.author);
+      const res = await fetch(`https://openlibrary.org/search.json?q=${searchQuery}&limit=5`);
+      const data = await res.json();
+
+      if (!data.docs || data.docs.length === 0) {
+        alert("No alternative matches found.");
+        return;
+      }
+
+      let optionsHtml = "<h3>Select Correct Match:</h3>";
+      data.docs.forEach((book, idx) => {
+        const cover = book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : "";
+        optionsHtml += `
+          <div>
+            <input type="radio" name="matchOption" value="${idx}" id="opt${idx}">
+            <label for="opt${idx}">${book.title} - ${book.author_name?.[0] || "Unknown Author"}</label>
+            ${cover ? `<img src="${cover}" width="100"/>` : ""}
+          </div>
+        `;
+      });
+      optionsHtml += `<button id="confirmMatchBtn">Confirm Match</button>`;
+
+      const matchDiv = document.createElement("div");
+      matchDiv.innerHTML = optionsHtml;
+      document.body.appendChild(matchDiv);
+
+      document.getElementById("confirmMatchBtn").addEventListener("click", async () => {
+        const selectedIdx = document.querySelector('input[name="matchOption"]:checked');
+        if (!selectedIdx) return alert("Please select a match.");
+
+        const selectedBook = data.docs[selectedIdx.value];
+        const cover = selectedBook.cover_i ? `https://covers.openlibrary.org/b/id/${selectedBook.cover_i}-M.jpg` : "";
+
+        await updateDoc(doc(db, "submissions", docId), {
+          matchedTitle: selectedBook.title,
+          matchedAuthor: selectedBook.author_name?.[0] || "",
+          coverUrl: cover,
+          description: selectedBook.first_sentence?.[0] || "",
+          confirmed: true
+        });
+
+        matchDiv.remove();
+        loadUserSubmissions();
+      });
+    }
+
   </script>
 </body>
 </html>
