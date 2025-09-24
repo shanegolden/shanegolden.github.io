@@ -12,21 +12,18 @@
   </style>
 </head>
 <body>
-  <h1>📚 Admin Panel</h1>
+  <h1>📚 Admin Panel!</h1>
   <button id="logoutBtn">Log Out</button>
   <hr>
 
-  <!-- Pending Members Section -->
   <div id="pendingMembers"></div>
   <hr>
 
-  <!-- Submission Period Control -->
   <button id="openSubmissionsBtn">Open Book Submissions</button>
   <button id="closeSubmissionsBtn">Close Book Submissions</button>
   <p id="submissionStatus"></p>
   <hr>
 
-  <!-- Members & Books -->
   <h2>Members & Submissions</h2>
   <div id="membersList"></div>
 
@@ -66,7 +63,6 @@
 
     let currentPeriodDoc = null;
 
-    // PROTECT PAGE
     onAuthStateChanged(auth, async (user) => {
       if (!user || user.uid !== adminUID) {
         alert("Admin access only");
@@ -79,7 +75,7 @@
       loadMembersList();
     });
 
-    // PENDING MEMBERS APPROVAL
+    // Pending members approval
     async function loadPendingMembers() {
       const membersSnap = await getDocs(collection(db, "members"));
       const pendingMembers = membersSnap.docs.filter(d => !d.data().approved);
@@ -113,7 +109,7 @@
       });
     }
 
-    // SUBMISSION PERIOD CONTROL
+    // Submission period control
     async function loadSubmissionPeriod() {
       const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
       const current = periodsSnap.docs.find(d => d.data().open);
@@ -138,7 +134,7 @@
       }
     });
 
-    // MEMBERS & SUBMISSIONS
+    // Members and books
     async function loadMembersList() {
       membersListDiv.innerHTML = "";
       const membersSnap = await getDocs(collection(db, "members"));
@@ -166,33 +162,6 @@
             const booksSnap = await getDocs(collection(db, "books"));
             const userBooks = booksSnap.docs.filter(b => b.data().submittedBy === memberDoc.id);
             booksContainer.innerHTML = "";
-
-            // Add book form for admin to add book to this member
-            const addFormDiv = document.createElement("div");
-            addFormDiv.classList.add("addBookForm");
-            addFormDiv.innerHTML = `
-              <input placeholder="Title" class="addBookTitle" />
-              <input placeholder="Author" class="addBookAuthor" />
-              <input placeholder="Cover URL" class="addBookCover" />
-              <textarea placeholder="Description" class="addBookDescription"></textarea>
-              <button class="addBookBtn">Add Book</button>
-            `;
-            booksContainer.appendChild(addFormDiv);
-
-            addFormDiv.querySelector(".addBookBtn").addEventListener("click", async () => {
-              const title = addFormDiv.querySelector(".addBookTitle").value.trim();
-              const author = addFormDiv.querySelector(".addBookAuthor").value.trim();
-              const coverUrl = addFormDiv.querySelector(".addBookCover").value.trim();
-              const description = addFormDiv.querySelector(".addBookDescription").value.trim();
-              if (!title || !author) return;
-
-              await addDoc(collection(db, "books"), {
-                title, author, coverUrl, description, submittedBy: memberDoc.id, votes: 0, active: false, createdAt: serverTimestamp()
-              });
-              loadMembersList();
-            });
-
-            if (userBooks.length === 0) booksContainer.innerHTML += "<p>No books submitted.</p>";
 
             userBooks.forEach(bookDoc => {
               const book = bookDoc.data();
@@ -224,12 +193,15 @@
                 loadMembersList();
               });
 
-              // DELETE without confirmation
+              // DELETE FIXED
               bookDiv.querySelector(".deleteBtn").addEventListener("click", async () => {
-                await deleteDoc(doc(db, "books", bookDoc.id));
-                loadMembersList();
+                try {
+                  await deleteDoc(doc(db, "books", bookDoc.id));
+                  booksContainer.removeChild(bookDiv); // remove from DOM immediately
+                } catch (err) {
+                  console.error("Delete failed:", err);
+                }
               });
-
             });
 
           } else {
