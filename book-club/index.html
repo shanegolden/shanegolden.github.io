@@ -13,9 +13,9 @@
   // Firebase SDKs
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-  // 🔑 Your Firebase config
+  // 🔑 Your Firebase config (leave as you have it)
   const firebaseConfig = {
     apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
     authDomain: "book-club-f42b1.firebaseapp.com",
@@ -26,38 +26,49 @@
     measurementId: "G-8BD4H79Z5Q"
   };
 
-  // 🔥 Initialize Firebase
+  // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  // Render signup form
+  // Render signup form (now includes name)
   document.getElementById("app").innerHTML = `
     <h2>Sign Up</h2>
+    <input id="name" placeholder="Full name" />
     <input id="email" placeholder="Email" />
     <input id="password" placeholder="Password" type="password" />
     <button id="signup">Sign Up</button>
     <p id="message"></p>
   `;
 
-  // Signup logic
+  // Signup logic: create Auth user, then create members doc with UID
   document.getElementById("signup").addEventListener("click", async () => {
-    const email = document.getElementById("email").value;
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
 
-    try {
-      // 1️⃣ Create account in Firebase Auth
-      await createUserWithEmailAndPassword(auth, email, password);
+    if (!name || !email || !password) {
+      document.getElementById("message").innerText = "Please fill name, email, and password.";
+      return;
+    }
 
-      // 2️⃣ Add user to Firestore "members" with approved: false
-      await addDoc(collection(db, "members"), {
+    try {
+      // 1) create account in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = userCredential.user.uid;
+
+      // 2) create a members document with the UID as the doc id
+      await setDoc(doc(db, "members", uid), {
+        name: name,
         email: email,
-        approved: true
+        approved: false,
+        role: "member",      // default role
+        appliedAt: new Date()
       });
 
-      document.getElementById("message").innerText =
-        "Signup success! Waiting for admin approval.";
+      document.getElementById("message").innerText = "Signup success! Waiting for admin approval.";
     } catch (error) {
+      console.error("Signup error:", error);
       document.getElementById("message").innerText = error.message;
     }
   });
