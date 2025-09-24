@@ -12,9 +12,10 @@
 <script type="module">
   // Firebase SDKs
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
+  // 🔑 Your Firebase config
   const firebaseConfig = {
     apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
     authDomain: "book-club-f42b1.firebaseapp.com",
@@ -25,29 +26,42 @@
     measurementId: "G-8BD4H79Z5Q"
   };
 
+  // 🔥 Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
+  // Render signup form
   document.getElementById("app").innerHTML = `
     <h2>Sign Up</h2>
     <input id="email" placeholder="Email" />
     <input id="password" placeholder="Password" type="password" />
     <button id="signup">Sign Up</button>
+    <p id="message"></p>
   `;
 
+  // Signup logic
   document.getElementById("signup").addEventListener("click", async () => {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
+
     try {
+      // 1️⃣ Create account in Firebase Auth
       await createUserWithEmailAndPassword(auth, email, password);
-      alert("Signup success!");
+
+      // 2️⃣ Add user to Firestore "members" with approved: false
+      await addDoc(collection(db, "members"), {
+        email: email,
+        approved: false
+      });
+
+      document.getElementById("message").innerText =
+        "Signup success! Waiting for admin approval.";
     } catch (error) {
-      alert(error.message);
+      document.getElementById("message").innerText = error.message;
     }
   });
 </script>
 
-  
 </body>
 </html>
