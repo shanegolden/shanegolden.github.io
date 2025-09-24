@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Login - Book Club</title>
+</head>
+<body>
+  <h1>Login</h1>
+  <input id="loginEmail" placeholder="Email" />
+  <input id="loginPassword" placeholder="Password" type="password" />
+  <button id="loginBtn">Log in</button>
+  <p id="loginMsg"></p>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
+      authDomain: "book-club-f42b1.firebaseapp.com",
+      projectId: "book-club-f42b1",
+      storageBucket: "book-club-f42b1.appspot.com",
+      messagingSenderId: "85630091573",
+      appId: "1:85630091573:web:427077f1351140fc278c7c",
+      measurementId: "G-8BD4H79Z5Q"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      try {
+        // sign in
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        const uid = cred.user.uid;
+
+        // get their member doc
+        const memberSnap = await getDoc(doc(db, "members", uid));
+        if (!memberSnap.exists()) {
+          // no application / member record
+          await signOut(auth);
+          document.getElementById("loginMsg").innerText = "No membership application found. Please apply first.";
+          return;
+        }
+
+        const data = memberSnap.data();
+        if (!data.approved) {
+          // signed in but not approved — sign them out and message
+          await signOut(auth);
+          document.getElementById("loginMsg").innerText = "Your application is still pending approval.";
+          return;
+        }
+
+        // Approved — redirect based on role
+        if (data.role === "admin") {
+          window.location.href = "admin.html";
+        } else {
+          window.location.href = "dashboard.html";
+        }
+      } catch (err) {
+        console.error("Login error", err);
+        document.getElementById("loginMsg").innerText = err.message;
+      }
+    });
+  </script>
+</body>
+</html>
