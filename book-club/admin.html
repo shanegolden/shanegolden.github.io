@@ -88,6 +88,76 @@ async function loadPendingMembers() {
     });
   });
 }
+
+import { addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+// Fetch book info from Open Library API by ISBN
+async function fetchBookInfo(isbn) {
+  if (!isbn) return null;
+  try {
+    const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+    const data = await res.json();
+    const key = `ISBN:${isbn}`;
+    if (data[key]) {
+      return {
+        title: data[key].title || "",
+        author: data[key].authors?.[0]?.name || "",
+        coverUrl: data[key].cover?.medium || ""
+      };
+    }
+  } catch (err) {
+    console.error("Error fetching book info:", err);
+  }
+  return null;
+}
+
+// Handle Add Book button click
+document.getElementById("addBookBtn").addEventListener("click", async () => {
+  const titleInput = document.getElementById("bookTitle").value.trim();
+  const authorInput = document.getElementById("bookAuthor").value.trim();
+  const isbnInput = document.getElementById("bookISBN").value.trim();
+
+  let title = titleInput;
+  let author = authorInput;
+  let coverUrl = "";
+
+  // If ISBN is provided, try fetching real info
+  if (isbnInput) {
+    const info = await fetchBookInfo(isbnInput);
+    if (info) {
+      title = info.title || title;
+      author = info.author || author;
+      coverUrl = info.coverUrl || "";
+    }
+  }
+
+  if (!title || !author) {
+    document.getElementById("bookMessage").innerText = "Title and author are required.";
+    return;
+  }
+
+  try {
+    await addDoc(collection(db, "books"), {
+      title,
+      author,
+      submittedBy: auth.currentUser.uid,
+      coverUrl,
+      votes: 0,
+      active: false,
+      createdAt: serverTimestamp()
+    });
+
+    document.getElementById("bookMessage").innerText = `Book "${title}" added successfully!`;
+    document.getElementById("bookTitle").value = "";
+    document.getElementById("bookAuthor").value = "";
+    document.getElementById("bookISBN").value = "";
+  } catch (err) {
+    console.error("Error adding book:", err);
+    document.getElementById("bookMessage").innerText = "Failed to add book. Check console for details.";
+  }
+});
+
+    
 </script>
 
 </body>
