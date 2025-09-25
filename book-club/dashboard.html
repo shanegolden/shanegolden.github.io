@@ -49,7 +49,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, query, where, addDoc, getDocs, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, addDoc, getDocs, orderBy, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -78,10 +78,9 @@ onAuthStateChanged(auth, async (user) => {
   if (!user) return window.location.href="login.html";
   currentUser = user;
   await loadCurrentPeriod();
-  await loadMySubmissions();
+  listenToMySubmissions(); // real-time updates
 });
 
-// Fetch the current active submission period
 async function loadCurrentPeriod() {
   const periodsSnap = await getDocs(collection(db,"submissionPeriods"));
   const openPeriod = periodsSnap.docs.find(d=>d.data().active);
@@ -100,19 +99,12 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
   const author = document.getElementById("bookAuthor").value.trim();
   if(!title || !author) return alert("Title and author required.");
 
-  // Refresh current period
-  await loadCurrentPeriod();
   if(!currentPeriodId) return alert("No active submission period.");
 
-  const q = query(
-    collection(db,"books"),
-    where("submittedBy","==",currentUser.uid),
-    where("periodId","==",currentPeriodId)
-  );
-  const existing = await getDocs(q);
-  if(!existing.empty) return alert("You already submitted a book for this period.");
+  const q = query(collection(db,"books"), where("submittedBy","==",currentUser.uid), where("periodId","==",currentPeriodId));
+  const existingSnap = await getDocs(q);
+  if(!existingSnap.empty) return alert("You already submitted a book for this period.");
 
-  // Fetch matches from OpenLibrary
   const queryStr = `${title} ${author}`;
   let matches = [];
   try {
@@ -153,34 +145,30 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
         createdAt: serverTimestamp()
       });
       container.innerHTML = "<p>Book submitted!</p>";
-      await loadMySubmissions();
     });
   });
 });
 
-// Load user's submissions
-async function loadMySubmissions() {
+// Real-time listener for user's submissions
+function listenToMySubmissions() {
   if(!currentUser) return;
-  const q = query(
-    collection(db,"books"),
-    where("submittedBy","==",currentUser.uid),
-    orderBy("createdAt","desc")
-  );
-  const snap = await getDocs(q);
-  const container = document.getElementById("mySubmissionsList");
-  container.innerHTML = "";
-  snap.docs.forEach(docSnap => {
-    const b = docSnap.data();
-    const div = document.createElement("div");
-    div.className = "submission-card";
-    div.innerHTML = `
-      <img src="${b.coverUrl}" class="book-cover"/>
-      <div class="book-info">
-        <h3>${b.title}</h3>
-        <p>${b.author}</p>
-      </div>
-    `;
-    container.appendChild(div);
+  const q = query(collection(db,"books"), where("submittedBy","==",currentUser.uid), orderBy("createdAt","desc"));
+  onSnapshot(q, snap => {
+    const container = document.getElementById("mySubmissionsList");
+    container.innerHTML = "";
+    snap.docs.forEach(docSnap => {
+      const b = docSnap.data();
+      const div = document.createElement("div");
+      div.className = "submission-card";
+      div.innerHTML = `
+        <img src="${b.coverUrl}" class="book-cover"/>
+        <div class="book-info">
+          <h3>${b.title}</h3>
+          <p>${b.author}</p>
+        </div>
+      `;
+      container.appendChild(div);
+    });
   });
 }
 </script>
