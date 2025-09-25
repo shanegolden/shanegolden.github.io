@@ -9,11 +9,10 @@
   header { background:#1e1e2f; color:white; padding:1rem; text-align:center; }
   h1 { margin:0 0 0.5rem 0; }
   .container { max-width:900px; margin:2rem auto; padding:1rem; background:white; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
-  .book-card { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.5rem; padding:1rem; border-radius:8px; background:#f0f4f8; }
+  .book-card { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.5rem; padding:1rem; border-radius:8px; background:#f0f4f8; margin-bottom:1rem; }
   .book-card img { max-width:150px; height:auto; border-radius:5px; }
-  form { display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem; }
-  input { padding:0.5rem; border-radius:5px; border:1px solid #ccc; width:100%; box-sizing:border-box; }
-  button { padding:0.5rem 1rem; border:none; border-radius:5px; cursor:pointer; background:#4a90e2; color:white; font-weight:bold; }
+  input { padding:0.5rem; border-radius:5px; border:1px solid #ccc; width:100%; margin-bottom:0.5rem; box-sizing:border-box; }
+  button { padding:0.5rem 1rem; border:none; border-radius:5px; cursor:pointer; background:#4a90e2; color:white; font-weight:bold; margin-bottom:0.5rem; }
   button:hover { opacity:0.9; }
   .message { color:red; margin-top:0.5rem; }
   @media(max-width:600px){
@@ -24,33 +23,30 @@
 <body>
 
 <header>
-  <h1>📚 Club</h1>
-  <p>Check out the most recent winning book and join our club!</p>
+  <h1>📚 Welcome to the Book Club</h1>
 </header>
 
 <div class="container">
-  <div id="bookInfo"><p>Loading recent book...</p></div>
+  <div id="bookInfo"><p>Loading most recent winning book...</p></div>
 
-  <div id="authForms">
-    <h2>Sign Up</h2>
-    <input id="name" placeholder="Full name" />
-    <input id="email" placeholder="Email" />
-    <input id="password" placeholder="Password" type="password" />
-    <button id="signupBtn">Sign Up</button>
-    <p class="message" id="signupMessage"></p>
+  <h2>Log In</h2>
+  <input id="loginEmail" placeholder="Email" />
+  <input id="loginPassword" placeholder="Password" type="password" />
+  <button id="loginBtn">Log In</button>
+  <p id="loginMsg" class="message"></p>
 
-    <h2>Log In</h2>
-    <input id="loginEmail" placeholder="Email" />
-    <input id="loginPassword" placeholder="Password" type="password" />
-    <button id="loginBtn">Log In</button>
-    <p class="message" id="loginMessage"></p>
-  </div>
+  <h2>Sign Up</h2>
+  <input id="name" placeholder="Full name" />
+  <input id="email" placeholder="Email" />
+  <input id="password" placeholder="Password" type="password" />
+  <button id="signup">Sign Up</button>
+  <p id="message" class="message"></p>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getFirestore, collection, query, where, orderBy, limit, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -66,125 +62,62 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const bookInfoDiv = document.getElementById("bookInfo");
-const signupMessage = document.getElementById("signupMessage");
-const loginMessage = document.getElementById("loginMessage");
-
-// Load recent winner
+// Load the most recent winning book
 async function loadRecentBook() {
+  const bookInfoDiv = document.getElementById("bookInfo");
   try {
-    const periodsSnap = await getDocs(collection(db,"submissionPeriods"));
-    const periods = periodsSnap.docs.map(d=>({id:d.id,...d.data()}))
-                          .sort((a,b)=>b.createdAt?.toMillis() - a.createdAt?.toMillis());
-    const latestPeriod = periods[0];
-    if(!latestPeriod){
-      bookInfoDiv.innerHTML = "<p>No books have been voted on yet.</p>";
-      return;
-    }
+    const periodsSnap = await getDocs(query(collection(db, "submissionPeriods"), orderBy("createdAt", "desc"), limit(1)));
+    if(periodsSnap.empty) { bookInfoDiv.innerHTML = "<p>No books yet.</p>"; return; }
 
-    const booksSnap = await getDocs(query(collection(db,"books"), where("periodId","==",latestPeriod.id)));
-    const books = booksSnap.docs.map(d=>({id:d.id,...d.data()}));
-    if(books.length===0 || books.every(b=>!b.votes?.length)){
-      bookInfoDiv.innerHTML = "<p>No winner yet for the most recent period.</p>";
-      return;
-    }
+    const latestPeriodId = periodsSnap.docs[0].id;
+    const booksSnap = await getDocs(query(collection(db, "books"), where("periodId", "==", latestPeriodId)));
+    const books = booksSnap.docs.map(d => ({id: d.id, ...d.data()}));
+    const winner = books.sort((a,b) => (b.votes?.length||0) - (a.votes?.length||0))[0];
 
-    const winner = books.sort((a,b)=>(b.votes?.length||0)-(a.votes?.length||0))[0];
-
-    let details = {};
-    try {
-      const res = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(winner.title)}&author=${encodeURIComponent(winner.author)}&limit=1`);
-      const data = await res.json();
-      if(data.docs && data.docs.length>0){
-        const doc = data.docs[0];
-        details.year = doc.first_publish_year || "Unknown";
-        details.pages = doc.number_of_pages_median || "Unknown";
-        details.description = doc.subtitle || doc.text?.slice(0,200)?.join(" ") || "No description available";
-      } else {
-        details = {year:"Unknown", pages:"Unknown", description:"No description available"};
-      }
-    } catch(err){
-      console.error(err);
-      details = {year:"Unknown", pages:"Unknown", description:"No description available"};
-    }
+    if(!winner) { bookInfoDiv.innerHTML = "<p>No winner yet</p>"; return; }
 
     bookInfoDiv.innerHTML = `
       <div class="book-card">
-        <img src="${winner.coverUrl}" alt="${winner.title} cover" />
+        <img src="${winner.coverUrl}" alt="${winner.title}" />
         <h3>${winner.title}</h3>
         <p><strong>Author:</strong> ${winner.author}</p>
-        <p><strong>Year Published:</strong> ${details.year}</p>
-        <p><strong>Pages:</strong> ${details.pages}</p>
-        <p style="font-size:0.9rem;">${details.description}</p>
         <p><strong>Votes:</strong> ${winner.votes?.length || 0}</p>
       </div>
     `;
-  } catch(err){
-    console.error("Error loading recent book:", err);
+  } catch(e) {
+    console.error(e);
     bookInfoDiv.innerHTML = "<p>Error loading book info</p>";
   }
 }
+loadRecentBook();
 
-// Sign up
-document.getElementById("signupBtn").addEventListener("click", async () => {
-  const name = document.getElementById("name").value.trim();
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
-
-  if(!name || !email || !password){
-    signupMessage.innerText = "Please fill in all fields.";
-    return;
-  }
-
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth,email,password);
-    const uid = userCredential.user.uid;
-    // create member document
-    await setDoc(doc(db,"members",uid), {
-      name, email, approved:false, role:"member", appliedAt:new Date()
-    });
-    signupMessage.innerText = "Signup successful! Waiting for admin approval.";
-  } catch(err){
-    console.error(err);
-    signupMessage.innerText = err.message;
-  }
-});
-
-// Log in
+// Log In
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value;
+  const loginMsg = document.getElementById("loginMsg");
 
   try {
-    const cred = await signInWithEmailAndPassword(auth,email,password);
-    const uid = cred.user.uid;
-
-    const memberSnap = await getDocs(doc(db,"members",uid));
-    if(!memberSnap.exists()){
-      await signOut(auth);
-      loginMessage.innerText = "No membership application found. Please apply first.";
-      return;
-    }
-    const data = memberSnap.data();
-    if(!data.approved){
-      await signOut(auth);
-      loginMessage.innerText = "Your application is still pending approval.";
-      return;
-    }
-
-    if(data.role==="admin"){
-      window.location.href="admin.html";
-    } else {
-      window.location.href="dashboard.html";
-    }
-  } catch(err){
-    console.error(err);
-    loginMessage.innerText = err.message;
-  }
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    window.location.href = "dashboard.html";
+  } catch(e) { console.error(e); loginMsg.innerText = e.message; }
 });
 
-// Initialize
-loadRecentBook();
+// Sign Up
+document.getElementById("signup").addEventListener("click", async () => {
+  const name = document.getElementById("name").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const message = document.getElementById("message");
+
+  if(!name || !email || !password) { message.innerText = "Please fill name, email, and password."; return; }
+
+  try {
+    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    await setDoc(doc(db, "members", userCred.user.uid), { name, email, approved:false, role:"member", appliedAt:new Date() });
+    message.innerText = "Signup success! Waiting for admin approval.";
+  } catch(e) { console.error(e); message.innerText = e.message; }
+});
 </script>
 
 </body>
