@@ -24,10 +24,10 @@
 </style>
 </head>
 <body>
-<header>📚 Book Club Dashboard</header>
+<header>📚 Book Club Dashboard!</header>
 <main>
 
-  <!-- Dynamic Top Section: Submission Form or Voting -->
+  <!-- Dynamic Top Section: Submission Form -->
   <div id="topSection"></div>
 
   <!-- Submission History -->
@@ -39,7 +39,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, doc, addDoc, updateDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, addDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -56,96 +56,49 @@ const db = getFirestore(app);
 
 let currentUser = null;
 
-// Load top section (submission form or voting)
+// Load submission form
 async function loadTopSection() {
   const topSection = document.getElementById("topSection");
   topSection.innerHTML = "";
 
-  // Fetch current active submission period
-  const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
-  let activePeriod = null;
-  periodsSnap.forEach(d => {
-    const data = d.data();
-    if(data.active) activePeriod = { id: d.id, ...data };
+  const formDiv = document.createElement("div");
+  formDiv.className = "card";
+  formDiv.innerHTML = `
+    <h2>Submit a Book</h2>
+    <input id="bookTitle" placeholder="Book Title" />
+    <input id="bookAuthor" placeholder="Book Author" />
+    <button id="submitBook" class="btn">Submit</button>
+    <div id="submissionMessage"></div>
+  `;
+  topSection.appendChild(formDiv);
+
+  document.getElementById("submitBook").addEventListener("click", async () => {
+    const title = document.getElementById("bookTitle").value.trim();
+    const author = document.getElementById("bookAuthor").value.trim();
+    if(!title || !author) { document.getElementById("submissionMessage").innerText="Enter title and author."; return; }
+
+    // Fetch active period
+    const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
+    let activePeriod = null;
+    periodsSnap.forEach(d => {
+      const data = d.data();
+      if(data.active) activePeriod = { id: d.id, ...data };
+    });
+    if(!activePeriod) { document.getElementById("submissionMessage").innerText="No active submission period."; return; }
+
+    await addDoc(collection(db, "books"), {
+      title,
+      author,
+      submittedBy: currentUser.uid,
+      periodId: activePeriod.id,
+      createdAt: serverTimestamp()
+    });
+
+    document.getElementById("bookTitle").value="";
+    document.getElementById("bookAuthor").value="";
+    document.getElementById("submissionMessage").innerText="Book submitted!";
+    loadSubmissionHistory();
   });
-
-  // Check if voting is active for this period
-  const votingSnap = await getDocs(collection(db, "voting"));
-  let activeVoting = null;
-  votingSnap.forEach(d => {
-    const data = d.data();
-    if(data.periodId === activePeriod?.id && data.active) activeVoting = { id: d.id, ...data };
-  });
-
-  // Show submission form if period is active and voting is NOT active
-  if(activePeriod && !activeVoting) {
-    const formDiv = document.createElement("div");
-    formDiv.className = "card";
-    formDiv.innerHTML = `
-      <h2>Submit a Book</h2>
-      <input id="bookTitle" placeholder="Book Title" />
-      <input id="bookAuthor" placeholder="Book Author" />
-      <button id="submitBook" class="btn">Submit</button>
-      <div id="submissionMessage"></div>
-    `;
-    topSection.appendChild(formDiv);
-
-    document.getElementById("submitBook").addEventListener("click", async () => {
-      const title = document.getElementById("bookTitle").value.trim();
-      const author = document.getElementById("bookAuthor").value.trim();
-      if(!title || !author) { document.getElementById("submissionMessage").innerText="Enter title and author."; return; }
-
-      await addDoc(collection(db, "books"), {
-        title,
-        author,
-        submittedBy: currentUser.uid,
-        periodId: activePeriod.id,
-        createdAt: serverTimestamp()
-      });
-
-      document.getElementById("bookTitle").value="";
-      document.getElementById("bookAuthor").value="";
-      document.getElementById("submissionMessage").innerText="Book submitted!";
-      loadSubmissionHistory();
-    });
-
-  // Show voting section if period is active and voting IS active
-  } else if(activePeriod && activeVoting) {
-    const voteDiv = document.createElement("div");
-    voteDiv.className = "card";
-    voteDiv.innerHTML = `<h2>Vote for Your Favorite Books</h2><div id="voteBooks" class="vote-section"></div><button id="submitVote" class="btn">Submit Vote</button><div id="voteMessage"></div>`;
-    topSection.appendChild(voteDiv);
-
-    const voteContainer = document.getElementById("voteBooks");
-    const booksSnap = await getDocs(query(collection(db, "books"), where("periodId","==",activePeriod.id)));
-    booksSnap.forEach(d => {
-      const book = d.data();
-      const bookDiv = document.createElement("div");
-      bookDiv.className = "vote-book";
-      bookDiv.innerHTML = `
-        <input type="checkbox" class="voteCheckbox" data-bookid="${d.id}" />
-        <p>${book.title} by ${book.author}</p>
-      `;
-      voteContainer.appendChild(bookDiv);
-    });
-
-    document.getElementById("submitVote").addEventListener("click", async () => {
-      const checked = Array.from(document.querySelectorAll(".voteCheckbox:checked"));
-      if(checked.length === 0 || checked.length > 3) { document.getElementById("voteMessage").innerText="Select 1-3 books."; return; }
-
-      const votesRef = collection(db, "votes");
-      for(const c of checked){
-        await addDoc(votesRef, {
-          bookId: c.dataset.bookid,
-          userId: currentUser.uid,
-          periodId: activePeriod.id,
-          createdAt: serverTimestamp()
-        });
-      }
-      document.getElementById("voteMessage").innerText="Vote submitted!";
-      loadTopSection(); // refresh top section to prevent double voting
-    });
-  }
 }
 
 // Load user submission history
