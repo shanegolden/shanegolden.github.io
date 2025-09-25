@@ -18,6 +18,7 @@
   .submission-card:hover { transform: translateY(-2px); }
   .submission-card img.book-cover { width:120px; height:180px; object-fit:cover; border-radius:5px; }
   .book-info { flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+  .book-actions { margin-top:0.5rem; display:flex; gap:0.5rem; flex-wrap:wrap; }
   .my-submissions { margin-top:2rem; }
   h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
   .match-options { display:flex; flex-wrap:wrap; gap:1rem; margin-top:1rem; }
@@ -27,7 +28,7 @@
 </head>
 <body>
 <header>
-  <h1>📚 Book Club Dashboard!</h1>
+  <h1>📚 Book Club Dashboard</h1>
   <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -50,7 +51,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, query, where, addDoc, getDocs, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -141,7 +142,7 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
         periodId:currentPeriodId,
         createdAt:serverTimestamp()
       });
-      // Immediately show it
+      // Immediately show it with edit/delete/change options
       addSubmissionToList({id: docRef.id, ...b});
       container.innerHTML="<p>Book submitted!</p>";
     });
@@ -171,9 +172,54 @@ function addSubmissionToList(b) {
     <div class="book-info">
       <h3>${b.title}</h3>
       <p>${b.author}</p>
+      <div class="book-actions">
+        <button class="btn btn-primary editBook">Edit</button>
+        <button class="btn btn-primary changeCover">Change Cover</button>
+        <button class="btn btn-danger deleteBook">Delete</button>
+      </div>
     </div>
   `;
-  container.prepend(div); // show newest on top
+  container.prepend(div); // newest on top
+
+  // Delete book
+  div.querySelector(".deleteBook").addEventListener("click", async () => {
+    if (!confirm("Are you sure you want to delete this book?")) return;
+    await deleteDoc(doc(db, "books", b.id));
+    div.remove();
+  });
+
+  // Edit book title/author
+  div.querySelector(".editBook").addEventListener("click", async () => {
+    const newTitle = prompt("Edit book title:", b.title);
+    const newAuthor = prompt("Edit author:", b.author);
+    if (!newTitle || !newAuthor) return;
+    await updateDoc(doc(db, "books", b.id), { title: newTitle, author: newAuthor });
+    div.querySelector("h3").innerText = newTitle;
+    div.querySelector("p").innerText = newAuthor;
+    b.title = newTitle;
+    b.author = newAuthor;
+  });
+
+  // Change cover
+  div.querySelector(".changeCover").addEventListener("click", async () => {
+    const queryStr = `${b.title} ${b.author}`;
+    let matches = [];
+    try {
+      const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
+      const data = await res.json();
+      matches = data.docs.map(d => ({
+        coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/120x180"
+      }));
+    } catch (e) { console.error(e); }
+    if (matches.length === 0) matches.push({ coverUrl: "https://via.placeholder.com/120x180" });
+
+    const newCover = prompt(`Choose a cover number (1-${matches.length}):\n${matches.map((m, i) => `${i+1}: ${m.coverUrl}`).join("\n")}`);
+    const index = parseInt(newCover)-1;
+    if (!matches[index]) return;
+    await updateDoc(doc(db, "books", b.id), { coverUrl: matches[index].coverUrl });
+    div.querySelector("img.book-cover").src = matches[index].coverUrl;
+    b.coverUrl = matches[index].coverUrl;
+  });
 }
 </script>
 </body>
