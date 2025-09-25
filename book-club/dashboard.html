@@ -31,7 +31,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Book Club Dashboard</h1>
+<h1>📚 Club Dashboard</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -179,7 +179,6 @@ async function loadVotingOptions() {
     div.className="submission-card";
     const userAlreadyVoted = b.votes?.includes(currentUser.uid);
     div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p>
-      <div class="vote-info">Votes: ${b.votes?.length || 0}</div>
       <button class="btn btn-primary voteBtn" ${userAlreadyVoted || userVotesCount>=3 ? 'disabled' : ''}>Vote</button>
     </div>`;
     container.appendChild(div);
