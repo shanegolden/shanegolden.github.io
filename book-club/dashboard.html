@@ -28,7 +28,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Club Dashboard!</h1>
+<h1>📚 !Book Club Dashboard!</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -60,8 +60,8 @@ const db = getFirestore(app);
 
 let currentUser = null;
 let currentPeriodId = null;
-let userVoteCount = 0;
-let currentUserIsAdmin = false;
+let votingActive = false;
+let maxVotesPerUser = 3;
 
 // Logout
 document.getElementById("logoutBtn").addEventListener("click", async () => {
@@ -73,8 +73,7 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 onAuthStateChanged(auth, async (user) => {
   if (!user) return window.location.href="login.html";
   currentUser = user;
-  currentUserIsAdmin = (currentUser.uid === "sog7PT2TXTTqqXQFvG2j63blC6f1");
-  await setupSubmissionListener(); // real-time listener
+  await setupSubmissionListener(); // real-time listener for submissions
   await loadMySubmissions();
 });
 
@@ -86,10 +85,21 @@ async function setupSubmissionListener() {
     if(openPeriod) {
       currentPeriodId = openPeriod.id;
       document.getElementById("submissionForm").style.display = "block";
+      setupVotingListener(currentPeriodId);
     } else {
       currentPeriodId = null;
       document.getElementById("submissionForm").style.display = "none";
     }
+  });
+}
+
+// Real-time listener for voting status
+function setupVotingListener(periodId) {
+  const periodRef = doc(db,"submissionPeriods",periodId);
+  onSnapshot(periodRef, (snap) => {
+    const data = snap.data();
+    votingActive = data?.votingActive || false;
+    loadVotingOptions();
   });
 }
 
@@ -128,10 +138,9 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
         await addDoc(collection(db,"books"),{
           title:b.title, author:b.author, coverUrl:b.coverUrl,
           submittedBy:currentUser.uid, periodId:currentPeriodId,
-          votes: [],
-          createdAt:serverTimestamp()
+          createdAt:serverTimestamp(), votes:[]
         });
-        loadMySubmissions(); // reload submissions to reflect new book
+        loadMySubmissions();
         container.innerHTML="<p>Book submitted!</p>";
       } catch(err) {
         console.error(err);
@@ -142,7 +151,7 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
   });
 });
 
-// Load all my submissions (chronological, newest first)
+// Load all my submissions
 async function loadMySubmissions() {
   if(!currentUser) return;
   const q = query(collection(db,"books"), where("submittedBy","==",currentUser.uid));
@@ -156,88 +165,77 @@ async function loadMySubmissions() {
       const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds*1000 || 0;
       return bTime - aTime; // newest first
     });
-  submissions.forEach(b => addSubmissionToList(b, container));
+  submissions.forEach(b => addSubmissionToUI(container,b));
 }
 
-// Add submission to UI
-function addSubmissionToList(b, container) {
+function addSubmissionToUI(container,b) {
   const div = document.createElement("div");
-  div.className = "submission-card";
-
-  const isEditable = b.periodId === currentPeriodId && !b.votingActive;
-  div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><div class="book-actions">${isEditable ? '<button class="btn btn-primary editBook">Edit</button><button class="btn btn-primary changeCover">Change Cover</button><button class="btn btn-danger deleteBook">Delete</button>' : ''}</div></div>`;
-
+  div.className="submission-card";
+  div.innerHTML = `
+    <img src="${b.coverUrl}" class="book-cover"/>
+    <div class="book-info">
+      <h3>${b.title}</h3>
+      <p>${b.author}</p>
+      <div class="book-actions">
+        ${!votingActive ? `<button class="btn btn-primary editBook">Edit</button><button class="btn btn-primary changeCover">Change Cover</button><button class="btn btn-danger deleteBook">Delete</button>` : ""}
+      </div>
+    </div>
+  `;
   container.appendChild(div);
 
-  if(isEditable) {
-    div.querySelector(".editBook").addEventListener("click", async () => { /* edit logic */ });
-    div.querySelector(".changeCover").addEventListener("click", async () => { /* change cover logic */ });
-    div.querySelector(".deleteBook").addEventListener("click", async () => {
-      if(confirm("Delete this book?")) await deleteDoc(doc(db,"books",b.id));
-      loadMySubmissions();
+  if(!votingActive) {
+    div.querySelector(".editBook")?.addEventListener("click",()=>{ alert("Edit not implemented in this demo"); });
+    div.querySelector(".changeCover")?.addEventListener("click",()=>{ alert("Change cover not implemented"); });
+    div.querySelector(".deleteBook")?.addEventListener("click", async ()=>{
+      if(confirm("Delete this book?")) {
+        await deleteDoc(doc(db,"books",b.id));
+        loadMySubmissions();
+      }
     });
   }
 }
 
-// Voting logic (members can vote for up to 3 books, each book only once)
+// Load voting options
 async function loadVotingOptions() {
-  const snap = await getDocs(collection(db,"books"));
+  if(!currentPeriodId) return;
   const container = document.getElementById("matchSelection");
-  container.innerHTML = "<h3>Vote for Books</h3>";
-  const allBooks = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  container.innerHTML = votingActive ? "<h3>Vote for up to 3 books:</h3>" : "";
 
-  // count user's votes
-  userVoteCount = allBooks.filter(b => b.votes?.includes(currentUser.uid)).length;
+  if(!votingActive) return;
 
-  allBooks.forEach(b=>{
+  const q = query(collection(db,"books"), where("periodId","==",currentPeriodId));
+  const snap = await getDocs(q);
+  let books = snap.docs.map(docSnap=>({ id: docSnap.id, ...docSnap.data() }));
+
+  books = books.filter(b => b.submittedBy !== currentUser.uid || b.submittedBy === currentUser.uid); // everyone sees books including their own for reference
+
+  books.forEach(b=>{
     const div = document.createElement("div");
-    div.className = "submission-card";
+    div.className="submission-card";
     div.innerHTML = `
       <img src="${b.coverUrl}" class="book-cover"/>
       <div class="book-info">
         <h3>${b.title}</h3>
         <p>${b.author}</p>
-        ${currentUserIsAdmin ? `<p>Votes: ${b.votes?.length || 0}</p>` : ''}
-        <button class="btn btn-primary voteBook">Vote</button>
+        <button class="btn btn-primary voteBtn">Vote</button>
       </div>
     `;
     container.appendChild(div);
 
-    div.querySelector(".voteBook").addEventListener("click", async () => {
-      if(b.votes?.includes(currentUser.uid)) return alert("You already voted for this book");
-      if(userVoteCount >= 3) return alert("You can only vote for 3 books");
+    const voteBtn = div.querySelector(".voteBtn");
 
-      await updateDoc(doc(db,"books",b.id), { votes:[...(b.votes||[]), currentUser.uid] });
-      loadVotingOptions();
+    voteBtn.disabled = b.votes?.includes?.(currentUser.uid) || false;
+
+    voteBtn.addEventListener("click", async () => {
+      if(!b.votes) b.votes=[];
+      const userVotesSnap = await getDocs(query(collection(db,"books"), where("periodId","==",currentPeriodId), where("votes","array-contains",currentUser.uid)));
+      if(userVotesSnap.size >= maxVotesPerUser) return alert(`You can only vote for up to ${maxVotesPerUser} books.`);
+      b.votes.push(currentUser.uid);
+      await updateDoc(doc(db,"books",b.id), { votes:b.votes });
+      voteBtn.disabled = true;
     });
   });
 }
-
-// Initialize voting options if period is active and voting started
-async function initVoting() {
-  if(!currentPeriodId) return;
-  const periodDoc = await getDocs(collection(db,"submissionPeriods"));
-  const activePeriod = periodDoc.docs.find(d => d.id===currentPeriodId)?.data();
-  if(activePeriod?.votingActive) loadVotingOptions();
-}
-// Real-time listener for voting status
-  function setupVotingListener() {
-    if (!currentPeriodId) return;
-    const periodRef = doc(db, "submissionPeriods", currentPeriodId);
-  
-    onSnapshot(periodRef, (snap) => {
-      const data = snap.data();
-      if (data?.votingActive) {
-        loadVotingOptions(); // Voting started, load voting UI
-      } else {
-        document.getElementById("matchSelection").innerHTML = ""; // Clear voting UI if not active
-      }
-    });
-  }
-  
-  // Call this after currentPeriodId is set
-  setupVotingListener();;
-
 </script>
 </body>
 </html>
