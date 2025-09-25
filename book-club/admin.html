@@ -5,95 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Book Club Admin Panel</title>
 <style>
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f4f6f8;
-    margin: 0;
-    padding: 0;
-  }
-  header {
-    background: linear-gradient(90deg, #4f46e5, #6366f1);
-    color: white;
-    padding: 2rem;
-    text-align: center;
-    font-size: 1.8rem;
-    font-weight: bold;
-  }
-  main {
-    padding: 2rem;
-    max-width: 1000px;
-    margin: auto;
-  }
-  h2 {
-    color: #1f2937;
-    margin-top: 2rem;
-  }
-  .btn {
-    background: #4f46e5;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    cursor: pointer;
-    margin: 0.2rem;
-  }
-  .btn:hover {
-    background: #6366f1;
-  }
-  input {
-    padding: 0.5rem;
-    border-radius: 6px;
-    border: 1px solid #d1d5db;
-    margin-right: 0.5rem;
-    margin-bottom: 1rem;
-  }
-  .period-card, .submission-card {
-    background: white;
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  }
-  .submission-card {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    transition: transform 0.2s ease;
-  }
-  .submission-card:hover {
-    transform: translateY(-2px);
-  }
-  .book-cover {
-    width: 100px;
-    height: 150px;
-    object-fit: cover;
-    border-radius: 8px;
-    flex-shrink: 0;
-  }
-  .book-info {
-    flex-grow: 1;
-  }
-  .book-info h3 {
-    margin: 0;
-    font-size: 1.2rem;
-  }
-  .book-info p {
-    margin: 0.3rem 0;
-    color: #4b5563;
-  }
-  .edit-section {
-    margin-top: 0.5rem;
-  }
-  select {
-    padding: 0.4rem;
-    border-radius: 6px;
-    border: 1px solid #d1d5db;
-    margin-right: 0.5rem;
-  }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f8; margin: 0; padding: 0; }
+  header { background: linear-gradient(90deg, #4f46e5, #6366f1); color: white; padding: 2rem; text-align: center; font-size: 1.8rem; font-weight: bold; }
+  main { padding: 2rem; max-width: 1000px; margin: auto; }
+  h2 { color: #1f2937; margin-top: 2rem; }
+  .btn { background: #4f46e5; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; margin: 0.2rem; }
+  .btn:hover { background: #6366f1; }
+  input { padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db; margin-right: 0.5rem; margin-bottom: 1rem; }
+  .period-card, .submission-card { background: white; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .submission-card { display: flex; gap: 1rem; align-items: center; transition: transform 0.2s ease; }
+  .submission-card:hover { transform: translateY(-2px); }
+  .book-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+  .book-info { flex-grow: 1; }
+  .book-info h3 { margin: 0; font-size: 1.2rem; }
+  .book-info p { margin: 0.3rem 0; color: #4b5563; }
+  .edit-section { margin-top: 0.5rem; }
+  select { padding: 0.4rem; border-radius: 6px; border: 1px solid #d1d5db; margin-right: 0.5rem; }
 </style>
 </head>
 <body>
-<header>📚 Admin Panel!</header>
+<header>📚 Admin Panel</header>
 <main>
 
   <!-- Submission Period Control -->
@@ -109,10 +40,8 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import {
-  getFirestore, collection, getDocs, doc, updateDoc, addDoc, deleteDoc, query, where, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, doc, updateDoc, addDoc, deleteDoc, query, where, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -130,13 +59,14 @@ const db = getFirestore(app);
 let currentUser = null;
 let submissionOpen = false;
 
-// Load all submission periods
 async function loadSubmissionPeriods() {
   const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
   const container = document.getElementById("submissionPeriodsList");
   container.innerHTML = "";
-  periodsSnap.docs.sort((a, b) => b.data().createdAt?.toMillis() - a.data().createdAt?.toMillis())
-    .forEach(docSnap => {
+
+  const sortedPeriods = periodsSnap.docs.sort((a,b) => b.data().createdAt?.toMillis() - a.data().createdAt?.toMillis());
+  
+  sortedPeriods.forEach(async docSnap => {
     const period = docSnap.data();
     const card = document.createElement("div");
     card.className = "period-card";
@@ -153,28 +83,24 @@ async function loadSubmissionPeriods() {
     card.querySelector(".seeSubmissions").addEventListener("click", async () => {
       const submissionsListDiv = card.querySelector(".submissionsList");
       submissionsListDiv.innerHTML = "";
-      const submissionsSnap = await getDocs(query(collection(db, "books"), where("periodId", "==", docSnap.id)));
+      const submissionsSnap = await getDocs(query(collection(db, "books"), where("periodId","==",docSnap.id)));
 
       for (const bookDoc of submissionsSnap.docs) {
         const b = bookDoc.data();
-
         // Fetch member name or email
         let memberNameOrEmail = b.submittedBy;
         try {
-          const userQuery = query(collection(db, "users"), where("uid", "==", b.submittedBy));
-          const userSnap = await getDocs(userQuery);
-          if (!userSnap.empty) {
-            const userData = userSnap.docs[0].data();
+          const userDocSnap = await getDoc(doc(db, "users", b.submittedBy));
+          if(userDocSnap.exists()) {
+            const userData = userDocSnap.data();
             memberNameOrEmail = userData.name || userData.email || b.submittedBy;
           }
-        } catch (err) {
-          console.error("Error fetching member name/email:", err);
-        }
+        } catch(e) { console.error(e); }
 
         const subCard = document.createElement("div");
         subCard.className = "submission-card";
         subCard.innerHTML = `
-          <img src="${b.coverUrl || 'https://via.placeholder.com/100x150'}" class="book-cover"/>
+          <img src="${b.coverUrl || 'https://via.placeholder.com/120x180'}" class="book-cover"/>
           <div class="book-info">
             <h3>${b.title}</h3>
             <p>${b.author}</p>
@@ -189,11 +115,11 @@ async function loadSubmissionPeriods() {
 
         // Delete book
         subCard.querySelector(".deleteBook").addEventListener("click", async () => {
-          await deleteDoc(doc(db, "books", bookDoc.id));
+          await deleteDoc(doc(db,"books",bookDoc.id));
           subCard.remove();
         });
 
-        // Edit book (inline)
+        // Edit book
         subCard.querySelector(".editBook").addEventListener("click", async () => {
           const queryStr = `${b.title} ${b.author}`;
           const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
@@ -201,7 +127,7 @@ async function loadSubmissionPeriods() {
           const matches = data.docs.map(d => ({
             title: d.title,
             author: d.author_name?.[0] || "",
-            coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/100x150"
+            coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/120x180"
           }));
 
           const editDiv = document.createElement("div");
@@ -218,9 +144,8 @@ async function loadSubmissionPeriods() {
               </div>
             `;
             editDiv.appendChild(mDiv);
-
             mDiv.querySelector(".selectMatch").addEventListener("click", async () => {
-              await updateDoc(doc(db, "books", bookDoc.id), {
+              await updateDoc(doc(db,"books",bookDoc.id), {
                 title: m.title,
                 author: m.author,
                 coverUrl: m.coverUrl
@@ -236,77 +161,52 @@ async function loadSubmissionPeriods() {
       }
     });
 
-    // Inline edit submission period name
-    card.querySelector(".editPeriod").addEventListener("click", () => {
-      const nameEl = card.querySelector("h3");
-      const currentName = nameEl.innerText.replace(/\(Open\)|\(Closed\)/, "").trim();
-
-      const input = document.createElement("input");
-      input.value = currentName;
-      input.style.padding = "0.3rem";
-      input.style.borderRadius = "6px";
-      input.style.border = "1px solid #ccc";
-      input.style.marginRight = "0.5rem";
-
-      const saveBtn = document.createElement("button");
-      saveBtn.className = "btn";
-      saveBtn.innerText = "Save";
-
-      nameEl.replaceWith(input);
-      card.querySelector(".editPeriod").replaceWith(saveBtn);
-
-      saveBtn.addEventListener("click", async () => {
-        await updateDoc(doc(db, "submissionPeriods", docSnap.id), { name: input.value });
+    // Edit period name
+    card.querySelector(".editPeriod").addEventListener("click", async () => {
+      const newName = prompt("Enter new period name", period.name);
+      if(newName) {
+        await updateDoc(doc(db,"submissionPeriods",docSnap.id),{name:newName});
         loadSubmissionPeriods();
-      });
+      }
     });
 
     // Delete period
     card.querySelector(".deletePeriod").addEventListener("click", async () => {
-      await deleteDoc(doc(db, "submissionPeriods", docSnap.id));
+      await deleteDoc(doc(db,"submissionPeriods",docSnap.id));
       loadSubmissionPeriods();
     });
   });
 }
 
-// Toggle submission period open/close
+// Toggle submission
 document.getElementById("toggleSubmission").addEventListener("click", async () => {
   const nameInput = document.getElementById("periodName").value.trim();
-  if (!submissionOpen && !nameInput) {
-    document.getElementById("periodMessage").innerText = "Please enter a name for the submission period.";
-    return;
-  }
-  
-  const periodsRef = collection(db, "submissionPeriods");
-  // Close any active period
+  const periodsRef = collection(db,"submissionPeriods");
+
+  // Close any active
   const periodsSnap = await getDocs(periodsRef);
-  for (const d of periodsSnap.docs) {
-    if (d.data().active) {
-      await updateDoc(doc(db, "submissionPeriods", d.id), { active: false });
-    }
+  for(const d of periodsSnap.docs){
+    if(d.data().active) await updateDoc(doc(db,"submissionPeriods",d.id),{active:false});
   }
 
-  if (!submissionOpen) {
-    // Start new period
-    await addDoc(periodsRef, { name: nameInput, active: true, createdAt: serverTimestamp() });
-    submissionOpen = true;
-    document.getElementById("toggleSubmission").innerText = "Close Book Submissions";
-    document.getElementById("periodName").value = "";
+  if(!submissionOpen){
+    if(!nameInput){ document.getElementById("periodMessage").innerText="Enter a name for the period."; return; }
+    await addDoc(periodsRef,{name:nameInput, active:true, createdAt:serverTimestamp()});
+    submissionOpen=true;
+    document.getElementById("toggleSubmission").innerText="Close Book Submissions";
+    document.getElementById("periodName").value="";
   } else {
-    submissionOpen = false;
-    document.getElementById("toggleSubmission").innerText = "Start Book Submissions";
+    submissionOpen=false;
+    document.getElementById("toggleSubmission").innerText="Start Book Submissions";
   }
 
   loadSubmissionPeriods();
 });
 
 // Auth
-onAuthStateChanged(auth, async (user) => {
-  if (!user) window.location.href = "login.html";
-  else {
-    currentUser = user;
-    loadSubmissionPeriods();
-  }
+onAuthStateChanged(auth,user=>{
+  if(!user) window.location.href="login.html";
+  else { currentUser=user; loadSubmissionPeriods(); }
 });
 </script>
 </body>
