@@ -1,68 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Admin - Book Club</title>
-  <style>
-    .book-card {
-      display: flex;
-      align-items: center;
-      margin: 5px 0;
-    }
-    .book-card img {
-      width: 50px;
-      height: 75px;
-      object-fit: cover;
-      margin-right: 10px;
-    }
-    .books-container {
-      margin-left: 20px;
-      margin-bottom: 15px;
-    }
-    .submission-period {
-      margin-bottom: 15px;
-      padding: 5px;
-      border: 1px solid #ccc;
-    }
-    button { margin: 2px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - Book Club</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#f2f2f2; margin:0; padding:0; }
+  header { background:#4A90E2; color:white; padding:20px; text-align:center; }
+  main { max-width: 1000px; margin:20px auto; background:white; padding:20px; border-radius:10px; }
+  h1,h2,h3 { margin-top:0; }
+  button { padding:8px 15px; margin:5px; border:none; border-radius:5px; cursor:pointer; }
+  button.primary { background:#4A90E2; color:white; }
+  button.secondary { background:#7ED321; color:white; }
+  button.danger { background:#d9534f; color:white; }
+  button.disabled { background:grey; cursor:default; }
+  .member, .book-card { background:#f9f9f9; padding:10px; margin:10px 0; border-radius:8px; }
+  .book-card { display:flex; align-items:center; }
+  .book-card img { width:100px; margin-right:15px; border-radius:5px; }
+  .book-card .info { flex:1; }
+  .alternatives { margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; }
+  .alternatives div { cursor:pointer; padding:5px; border:1px solid #ccc; border-radius:5px; display:flex; align-items:center; }
+  .alternatives img { width:80px; margin-right:10px; border-radius:5px; }
+  #logoutBtn { position:fixed; top:20px; right:20px; padding:10px 20px; background:#d9534f; color:white; border:none; border-radius:5px; cursor:pointer; }
+</style>
 </head>
 <body>
-  <h1>📚 Admin Panel!</h1>
 
-  <!-- Pending Members Section -->
-  <div id="pendingMembers"></div>
-  <hr>
+<header>
+  <h1>📚 Admin Panel</h1>
+  <button id="logoutBtn">Logout</button>
+</header>
 
-  <!-- Submission Period Controls -->
-  <button id="startSubmissions">Start Book Submissions</button>
-  <button id="closeSubmissions">Close Book Submissions</button>
-  <hr>
+<main>
+  <h2>Book Submission Control</h2>
+  <button id="startSubmissions" class="primary">Start Book Submissions</button>
+  <button id="closeSubmissions" class="danger">Close Book Submissions</button>
 
-  <!-- Voting Controls -->
-  <button id="startVoting">Start Voting</button>
-  <button id="closeVoting">Close Voting</button>
-  <hr>
+  <h2>Members</h2>
+  <div id="membersContainer"></div>
 
-  <!-- Add Book for Member Section -->
   <h2>Add Book for Member</h2>
-  <select id="memberSelect"><option>Loading members...</option></select>
-  <input id="bookTitle" placeholder="Book Title" />
-  <input id="bookAuthor" placeholder="Author Name" />
-  <input id="bookISBN" placeholder="ISBN (optional)" />
-  <select id="submissionPeriodSelect"><option>Loading periods...</option></select>
-  <button id="addBookForMemberBtn">Add Book</button>
-  <div id="bookMessage"></div>
-  <hr>
-
-  <h2>Submission Periods</h2>
-  <div id="submissionPeriodsContainer"></div>
+  <div>
+    <select id="memberSelect"></select><br>
+    <input type="text" id="bookTitle" placeholder="Book Title">
+    <input type="text" id="bookAuthor" placeholder="Author Name">
+    <input type="text" id="bookISBN" placeholder="ISBN (optional)">
+    <select id="submissionPeriodSelect"></select><br>
+    <button id="addBookBtn" class="secondary">Add Book</button>
+    <div id="bookMessage"></div>
+  </div>
+</main>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 import { 
-  getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where 
+  getFirestore, collection, doc, getDocs, addDoc, updateDoc, onSnapshot, query, where, orderBy, serverTimestamp, deleteDoc 
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -79,142 +72,166 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Protect page: admin only
-let currentUser;
-onAuthStateChanged(auth, async (user) => {
-  if (!user) { window.location.href = "login.html"; return; }
-  currentUser = user;
-  const memberSnap = await getDocs(collection(db, "members"));
-  const admin = memberSnap.docs.find(d => d.id === user.uid && d.data().role === "admin");
-  if (!admin) {
-    alert("Admin access only."); signOut(auth); window.location.href = "login.html";
-  } else {
-    loadPendingMembers();
-    loadMembersSelect();
-    loadSubmissionPeriods();
-  }
+const ADMIN_UID = "sog7PT2TXTTqqXQFvG2j63blC6f1"; // Update your admin UID here
+
+document.getElementById("logoutBtn").addEventListener("click", async ()=>{
+  await signOut(auth);
+  window.location.href="login.html";
 });
 
-// Pending Members
-async function loadPendingMembers() {
-  const membersSnap = await getDocs(collection(db, "members"));
-  const pendingMembers = membersSnap.docs.filter(doc => !doc.data().approved && doc.data().role !== "admin");
-  const container = document.getElementById("pendingMembers");
-  container.innerHTML = "<h2>Pending Members</h2>";
-  if (pendingMembers.length === 0) { container.innerHTML += "<p>No pending members.</p>"; return; }
+let currentUser=null;
 
-  pendingMembers.forEach(docSnap => {
-    const data = docSnap.data();
-    const div = document.createElement("div");
-    div.innerHTML = `${data.name || "(No name)"} (${data.email}) <button class="approveBtn">Approve</button> <button class="denyBtn">Deny</button><hr>`;
-    container.appendChild(div);
-    div.querySelector(".approveBtn").addEventListener("click", async () => { await updateDoc(doc(db, "members", docSnap.id), { approved: true }); div.remove(); });
-    div.querySelector(".denyBtn").addEventListener("click", async () => { await deleteDoc(doc(db, "members", docSnap.id)); div.remove(); });
+// Check admin access
+onAuthStateChanged(auth,user=>{
+  if(!user) window.location.href="login.html";
+  currentUser=user;
+  if(user.uid!==ADMIN_UID){ alert("Admin only"); window.location.href="login.html"; }
+  loadMembers();
+  loadSubmissionPeriods();
+});
+
+// ---------------- Members ----------------
+async function loadMembers(){
+  const snap = await getDocs(collection(db,"members"));
+  const container=document.getElementById("membersContainer");
+  container.innerHTML="";
+  const selectMember=document.getElementById("memberSelect");
+  selectMember.innerHTML="<option value=''>Select Member</option>";
+  snap.forEach(docSnap=>{
+    const data=docSnap.data();
+    if(data.role!=="admin"){
+      const div=document.createElement("div");
+      div.className="member";
+      div.innerHTML=`<strong>${data.name||"(No Name)"}</strong> (${data.email})<div id="memberBooks-${docSnap.id}"></div>`;
+      container.appendChild(div);
+      selectMember.innerHTML+=`<option value="${docSnap.id}">${data.name}</option>`;
+      loadMemberBooks(docSnap.id);
+    }
   });
 }
 
-// Load members dropdown for add book
-async function loadMembersSelect() {
-  const membersSnap = await getDocs(collection(db, "members"));
-  const select = document.getElementById("memberSelect");
-  select.innerHTML = "";
-  membersSnap.docs.filter(d => d.data().approved && d.data().role !== "admin").forEach(docSnap => {
-    const opt = document.createElement("option");
-    opt.value = docSnap.id;
-    opt.text = d.data().name || docSnap.data().email;
-    select.appendChild(opt);
-  });
-}
-
-// Load submission periods dropdown for add book
-async function loadSubmissionPeriods() {
-  const periodsSnap = await getDocs(collection(db, "submissionsPeriods"));
-  const select = document.getElementById("submissionPeriodSelect");
-  select.innerHTML = "";
-  const container = document.getElementById("submissionPeriodsContainer");
-  container.innerHTML = "";
-  periodsSnap.docs.forEach(docSnap => {
-    const data = docSnap.data();
-    // Dropdown
-    const opt = document.createElement("option");
-    opt.value = docSnap.id;
-    opt.text = new Date(data.startTime?.toMillis()).toLocaleString() || "Unnamed Period";
-    select.appendChild(opt);
-
-    // Display in container with "View Books" button
-    const div = document.createElement("div");
-    div.classList.add("submission-period");
-    div.innerHTML = `<b>${opt.text}</b> <button class="viewBooksBtn">View Books</button><div class="books-container" style="display:none;"></div>`;
-    container.appendChild(div);
-
-    div.querySelector(".viewBooksBtn").addEventListener("click", async () => {
-      const booksContainer = div.querySelector(".books-container");
-      if (booksContainer.style.display === "none") {
-        // Fetch books for this period
-        const q = query(collection(db, "books"), where("periodId", "==", docSnap.id));
-        const booksSnap = await getDocs(q);
-        booksContainer.innerHTML = "";
-        booksSnap.docs.forEach(bookDoc => {
-          const book = bookDoc.data();
-          const bookDiv = document.createElement("div");
-          bookDiv.classList.add("book-card");
-          bookDiv.innerHTML = `
-            <img src="${book.coverUrl || ''}" alt="cover"/>
-            <div>
-              <b>${book.title}</b> by ${book.author} (submitted by ${book.submittedByName || book.submittedBy})
-              <br>
-              <button class="editBookBtn">Edit</button>
-              <button class="deleteBookBtn">Delete</button>
-            </div>
-          `;
-          booksContainer.appendChild(bookDiv);
-
-          bookDiv.querySelector(".deleteBookBtn").addEventListener("click", async () => {
-            await deleteDoc(doc(db, "books", bookDoc.id));
-            bookDiv.remove();
-          });
-
-          bookDiv.querySelector(".editBookBtn").addEventListener("click", () => {
-            alert("Edit book feature coming soon.");
-          });
-        });
-        booksContainer.style.display = "block";
-      } else {
-        booksContainer.style.display = "none";
-      }
+// ---------------- Submission Periods ----------------
+async function loadSubmissionPeriods(){
+  const snap = collection(db,"submissionsPeriods");
+  onSnapshot(snap, snapshot=>{
+    const selectPeriod=document.getElementById("submissionPeriodSelect");
+    selectPeriod.innerHTML="";
+    snapshot.forEach(docSnap=>{
+      const data=docSnap.data();
+      const option=document.createElement("option");
+      option.value=docSnap.id;
+      const date = data.startTime ? new Date(data.startTime.seconds*1000).toLocaleString() : docSnap.id;
+      option.innerText=date;
+      selectPeriod.appendChild(option);
     });
   });
 }
 
-// Start/Close submissions
-document.getElementById("startSubmissions").addEventListener("click", async () => {
-  await addDoc(collection(db, "submissionsPeriods"), { startTime: serverTimestamp(), open: true });
-  alert("Book submissions started!");
-  loadSubmissionPeriods();
-});
-document.getElementById("closeSubmissions").addEventListener("click", async () => {
-  const periodsSnap = await getDocs(collection(db, "submissionsPeriods"));
-  const lastPeriod = periodsSnap.docs[periodsSnap.docs.length - 1];
-  if (lastPeriod) await updateDoc(doc(db, "submissionsPeriods", lastPeriod.id), { open: false, endTime: serverTimestamp() });
-  alert("Book submissions closed!");
-  loadSubmissionPeriods();
+// ---------------- Start/Close Submissions ----------------
+document.getElementById("startSubmissions").addEventListener("click", async ()=>{
+  const snap = await getDocs(collection(db,"submissionsPeriods"));
+  await addDoc(collection(db,"submissionsPeriods"),{active:true,startTime:serverTimestamp()});
+  snap.forEach(docSnap=>updateDoc(doc(db,"submissionsPeriods",docSnap.id),{active:false}));
 });
 
-// Add Book for Member
-document.getElementById("addBookForMemberBtn").addEventListener("click", async () => {
-  const memberId = document.getElementById("memberSelect").value;
-  const title = document.getElementById("bookTitle").value.trim();
-  const author = document.getElementById("bookAuthor").value.trim();
-  const isbn = document.getElementById("bookISBN").value.trim();
-  const periodId = document.getElementById("submissionPeriodSelect").value;
+document.getElementById("closeSubmissions").addEventListener("click", async ()=>{
+  const snap = await getDocs(collection(db,"submissionsPeriods"));
+  snap.forEach(docSnap=>updateDoc(doc(db,"submissionsPeriods",docSnap.id),{active:false}));
+});
 
-  if (!title || !author) { alert("Title and author required"); return; }
+// ---------------- Add Book for Member ----------------
+async function fetchMatchedBook(title,author,isbn){
+  let alternatives=[];
+  if(isbn){
+    try{
+      const res=await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+      const data=await res.json();
+      const key=`ISBN:${isbn}`;
+      if(data[key]) alternatives.push({title:data[key].title||title,author:data[key].authors?.[0]?.name||author,coverUrl:data[key].cover?.medium||""});
+    }catch(e){console.error(e);}
+  }
+  try{
+    const res=await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=10`);
+    const data=await res.json();
+    if(data.docs.length>0){
+      data.docs.forEach(doc=>{
+        alternatives.push({title:doc.title,author:doc.author_name?.[0]||"",coverUrl:doc.cover_i?`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`:""});
+      });
+    }
+  }catch(e){console.error(e);}
+  return { title: alternatives[0]?.title||title, author: alternatives[0]?.author||author, coverUrl: alternatives[0]?.coverUrl||"", alternatives };
+}
 
-  await addDoc(collection(db, "books"), {
-    title, author, submittedBy: memberId, submittedByName: "", periodId, coverUrl: "", votes: 0, active: false, createdAt: serverTimestamp()
+document.getElementById("addBookBtn").addEventListener("click", async ()=>{
+  const memberId=document.getElementById("memberSelect").value;
+  const periodId=document.getElementById("submissionPeriodSelect").value;
+  const title=document.getElementById("bookTitle").value.trim();
+  const author=document.getElementById("bookAuthor").value.trim();
+  const isbn=document.getElementById("bookISBN").value.trim();
+  if(!memberId||!periodId||!title||!author){ document.getElementById("bookMessage").innerText="Fill all fields"; return; }
+
+  const matched=await fetchMatchedBook(title,author,isbn);
+  try{
+    await addDoc(collection(db,"books"),{
+      title:matched.title,
+      author:matched.author,
+      coverUrl:matched.coverUrl,
+      submittedBy:memberId,
+      submissionPeriodId:periodId,
+      createdAt:serverTimestamp(),
+      alternatives:matched.alternatives
+    });
+    document.getElementById("bookMessage").innerText="Book added successfully!";
+    loadMemberBooks(memberId);
+  }catch(e){console.error(e);}
+});
+
+// ---------------- Member Books ----------------
+async function loadMemberBooks(memberId){
+  const container=document.getElementById(`memberBooks-${memberId}`);
+  container.innerHTML="";
+  const q=query(collection(db,"books"),where("submittedBy","==",memberId),orderBy("createdAt","desc"));
+  const snap=await getDocs(q);
+  snap.forEach(docSnap=>{
+    const data=docSnap.data();
+    const card=document.createElement("div");
+    card.className="book-card";
+    card.innerHTML=`<img src="${data.coverUrl||''}"><div class="info"><strong>${data.title}</strong><br>by ${data.author}</div>
+    <div class="actions">
+      <button class="edit">Edit</button>
+      <button class="delete">Delete</button>
+    </div>`;
+    container.appendChild(card);
+
+    // Edit inline
+    const editBtn=card.querySelector(".edit");
+    editBtn.addEventListener("click", ()=>{
+      showEditOptions(card,docSnap.id,data);
+    });
+
+    // Delete book
+    const deleteBtn=card.querySelector(".delete");
+    deleteBtn.addEventListener("click", async ()=>{
+      await deleteDoc(doc(db,"books",docSnap.id));
+      loadMemberBooks(memberId);
+    });
   });
-  alert(`Book "${title}" added for member.`);
-});
+}
+
+// Inline edit with alternatives
+function showEditOptions(card,bookId,data){
+  card.innerHTML=`<img src="${data.coverUrl||''}"><div class="info"><strong>${data.title}</strong><br>by ${data.author}</div>`;
+  const altDiv=document.createElement("div"); altDiv.className="alternatives"; card.appendChild(altDiv);
+  data.alternatives.forEach(alt=>{
+    const option=document.createElement("div");
+    option.innerHTML=`<img src="${alt.coverUrl||''}"><span>${alt.title} by ${alt.author}</span>`;
+    option.addEventListener("click", async ()=>{
+      await updateDoc(doc(db,"books",bookId),{title:alt.title,author:alt.author,coverUrl:alt.coverUrl});
+      loadMemberBooks(data.submittedBy);
+    });
+    altDiv.appendChild(option);
+  });
+}
 </script>
 </body>
 </html>
