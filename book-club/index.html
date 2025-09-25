@@ -40,17 +40,6 @@
       text-align: center;
     }
 
-    .book-info {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-
-    .book-info img {
-      max-width: 100%;
-      border-radius: 6px;
-      margin-bottom: 1rem;
-    }
-
     input {
       width: 100%;
       padding: 0.7rem;
@@ -103,27 +92,19 @@
 <body>
   <header>📚 Club</header>
   <main>
-    <div class="book-info" id="bookInfo">
-      <h2>Most Recent Winning Book</h2>
-      <p>Loading book info...</p>
-    </div>
-
     <div class="login-signup-tabs">
-      <div id="tabSignup" class="active">Sign Up</div>
-      <div id="tabLogin">Log In</div>
+      <div id="tabLogin" class="active">Log In</div>
+      <div id="tabSignup">Sign Up</div>
     </div>
 
-    <div id="authForm">
-      <!-- Signup or Login form will be rendered here -->
-    </div>
-
+    <div id="authForm"></div>
     <p class="message" id="message"></p>
   </main>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -139,37 +120,10 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  const bookInfoDiv = document.getElementById("bookInfo");
   const authFormDiv = document.getElementById("authForm");
   const messageP = document.getElementById("message");
   const tabSignup = document.getElementById("tabSignup");
   const tabLogin = document.getElementById("tabLogin");
-
-  // Render the most recent winning book
-  async function loadRecentBook() {
-    try {
-      const booksQuery = query(collection(db, "books"), orderBy("votingDate", "desc"), limit(1));
-      const booksSnap = await getDocs(booksQuery);
-      if (!booksSnap.empty) {
-        const book = booksSnap.docs[0].data();
-        bookInfoDiv.innerHTML = `
-          <h2>${book.title}</h2>
-          <p><strong>Author:</strong> ${book.author}</p>
-          <p><strong>Year:</strong> ${book.year}</p>
-          <p><strong>Pages:</strong> ${book.pages}</p>
-          <img src="${book.coverURL}" alt="${book.title} cover" />
-          <p>${book.description}</p>
-        `;
-      } else {
-        bookInfoDiv.innerHTML = `<p>No books have been voted on yet.</p>`;
-      }
-    } catch (err) {
-      console.error(err);
-      bookInfoDiv.innerHTML = `<p>Error loading book info</p>`;
-    }
-  }
-
-  loadRecentBook();
 
   // Render signup form
   function renderSignup() {
@@ -268,8 +222,8 @@
     renderLogin();
   });
 
-  // Default load signup
-  renderSignup();
+  // Default load login
+  renderLogin();
 </script>
 </body>
 </html>
