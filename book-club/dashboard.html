@@ -28,7 +28,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Book Club Dashboard</h1>
+<h1>📚 Book Club Dashboard!</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -123,8 +123,9 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
           submittedBy:currentUser.uid, periodId:currentPeriodId,
           createdAt:serverTimestamp()
         });
-        // add new submission at the top immediately
-        addSubmissionToList({id: docRef.id, periodId: currentPeriodId, ...b}, document.getElementById("mySubmissionsList"));
+
+        // Reload submissions after slight delay to ensure timestamp exists
+        setTimeout(loadMySubmissions, 500);
         container.innerHTML="<p>Book submitted!</p>";
       } catch(err) {
         console.error(err);
@@ -144,7 +145,12 @@ async function loadMySubmissions() {
   container.innerHTML="";
   const submissions = snap.docs
     .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
-    .sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0)); // newest first
+    .sort((a,b) => {
+      // safest way to sort: use createdAt.seconds if available
+      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds*1000 || 0;
+      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds*1000 || 0;
+      return bTime - aTime; // newest first
+    });
   submissions.forEach(b => addSubmissionToList(b, container));
 }
 
@@ -156,18 +162,16 @@ function addSubmissionToList(b, container) {
   const isEditable = b.periodId === currentPeriodId;
   div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><div class="book-actions">${isEditable ? '<button class="btn btn-primary editBook">Edit</button><button class="btn btn-primary changeCover">Change Cover</button><button class="btn btn-danger deleteBook">Delete</button>' : ''}</div></div>`;
 
-  container.prepend(div); // newest at top
+  container.appendChild(div); // preserve chronological order loaded from sorted array
 
   if(!isEditable) return;
 
-  // Delete
   div.querySelector(".deleteBook").addEventListener("click", async () => {
     if(!confirm("Are you sure?")) return;
     await deleteDoc(doc(db,"books",b.id));
     div.remove();
   });
 
-  // Edit
   div.querySelector(".editBook").addEventListener("click", async () => {
     const newTitle = prompt("Edit title:", b.title);
     const newAuthor = prompt("Edit author:", b.author);
@@ -178,7 +182,6 @@ function addSubmissionToList(b, container) {
     b.title = newTitle; b.author = newAuthor;
   });
 
-  // Change Cover
   div.querySelector(".changeCover").addEventListener("click", async () => {
     const queryStr = `${b.title} ${b.author}`;
     let matches = [];
