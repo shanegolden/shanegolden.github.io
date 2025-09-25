@@ -1,185 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Book Club Dashboard</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #f5f6fa; margin: 0; padding: 0; }
-    header { background: #1e1e2f; color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
-    h1 { margin: 0; }
-    button { padding: 0.5rem 1rem; margin: 0.2rem; cursor: pointer; border: none; border-radius: 5px; }
-    button:hover { opacity: 0.9; }
-    .btn-primary { background: #4a90e2; color: white; }
-    .btn-danger { background: #e94b3c; color: white; }
-    .container { max-width: 900px; margin: 2rem auto; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    input { padding: 0.5rem; width: 100%; margin: 0.5rem 0; border-radius: 5px; border: 1px solid #ccc; }
-    .submission-card { display: flex; gap: 1rem; margin: 1rem 0; background: #f0f4f8; padding: 0.5rem; border-radius: 8px; }
-    .submission-card img.book-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 5px; }
-    .book-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
-    .my-submissions { margin-top: 2rem; }
-    h2 { border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; }
-    .match-options { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
-    .match-options .submission-card { width: 200px; flex-direction: column; align-items: center; }
-    .match-options .book-info { align-items: center; text-align: center; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Book Club Dashboard</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f5f6fa; margin: 0; padding: 0; }
+header { background: #1e1e2f; color: white; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+h1 { margin: 0; }
+button { padding: 0.5rem 1rem; margin: 0.2rem; cursor: pointer; border: none; border-radius: 5px; }
+button:hover { opacity: 0.9; }
+.btn-primary { background: #4a90e2; color: white; }
+.btn-danger { background: #e94b3c; color: white; }
+.container { max-width: 900px; margin: 2rem auto; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+input { padding: 0.5rem; width: 100%; margin: 0.5rem 0; border-radius: 5px; border: 1px solid #ccc; }
+.submission-card { display: flex; gap: 1rem; margin: 1rem 0; background: #f0f4f8; padding: 0.5rem; border-radius: 8px; }
+.submission-card img.book-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 5px; }
+.book-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+.my-submissions { margin-top: 2rem; }
+h2 { border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; }
+.match-options { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+.match-options .submission-card { width: 200px; flex-direction: column; align-items: center; }
+.match-options .book-info { align-items: center; text-align: center; }
+</style>
 </head>
 <body>
-  <header>
-    <h1>📚 Book Club Dashboard</h1>
-    <button id="logoutBtn" class="btn-danger">Logout</button>
-  </header>
+<header>
+<h1>📚 Book Club Dashboard!</h1>
+<button id="logoutBtn" class="btn-danger">Logout</button>
+</header>
 
-  <div class="container">
-    <h2>Submit a Book</h2>
-    <div id="submissionForm">
-      <input id="bookTitle" placeholder="Book Title" />
-      <input id="bookAuthor" placeholder="Author Name" />
-      <button id="submitBookBtn" class="btn-primary">Submit Book</button>
-    </div>
+<div class="container">
+<h2>Submit a Book</h2>
+<div id="submissionForm" style="display:none">
+<input id="bookTitle" placeholder="Book Title" />
+<input id="bookAuthor" placeholder="Author Name" />
+<button id="submitBookBtn" class="btn-primary">Submit Book</button>
+</div>
 
-    <div id="matchSelection" class="match-options"></div>
+<div id="matchSelection" class="match-options"></div>
 
-    <div class="my-submissions">
-      <h2>My Submissions</h2>
-      <div id="mySubmissionsList"></div>
-    </div>
-  </div>
+<div class="my-submissions">
+<h2>My Submissions</h2>
+<div id="mySubmissionsList"></div>
+</div>
+</div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-  import { getFirestore, collection, query, where, addDoc, getDocs, updateDoc, doc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getFirestore, collection, query, where, addDoc, getDocs, orderBy, serverTimestamp, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
-    authDomain: "book-club-f42b1.firebaseapp.com",
-    projectId: "book-club-f42b1",
-    storageBucket: "book-club-f42b1.appspot.com",
-    messagingSenderId: "85630091573",
-    appId: "1:85630091573:web:427077f1351140fc278c7c",
-    measurementId: "G-8BD4H79Z5Q"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
+  authDomain: "book-club-f42b1.firebaseapp.com",
+  projectId: "book-club-f42b1",
+  storageBucket: "book-club-f42b1.appspot.com",
+  messagingSenderId: "85630091573",
+  appId: "1:85630091573:web:427077f1351140fc278c7c",
+};
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-  let currentUser = null;
-  let currentPeriod = null;
-  let currentPeriodId = null;
+let currentUser = null;
+let currentPeriod = null;
+let currentPeriodId = null;
 
-  // Logout
-  document.getElementById("logoutBtn").addEventListener("click", async () => {
-    await signOut(auth);
-    window.location.href = "login.html";
-  });
+// Logout
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await signOut(auth);
+  window.location.href = "login.html";
+});
 
-  // Protect page & load user
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      window.location.href = "login.html";
-      return;
-    }
+// Protect page & load user
+onAuthStateChanged(auth, async (user) => {
+  if (!user) window.location.href = "login.html";
+  else {
     currentUser = user;
-    loadSubmissionStatus();
+    listenSubmissionPeriod();
     loadMySubmissions();
-  });
+  }
+});
 
-  // Check current submission period
-  async function loadSubmissionStatus() {
-    const periodsSnap = await getDocs(collection(db, "submissionsPeriods"));
-    const openPeriod = periodsSnap.docs.find(p => p.data().isOpen);
-    if (openPeriod) {
-      currentPeriod = openPeriod.data();
-      currentPeriodId = openPeriod.id;
+// Listen for active submission period in real-time
+function listenSubmissionPeriod() {
+  const periodsRef = collection(db, "submissionPeriods");
+  onSnapshot(periodsRef, (snapshot) => {
+    const openPeriodDoc = snapshot.docs.find(d => d.data().active);
+    if (openPeriodDoc) {
+      currentPeriod = openPeriodDoc.data();
+      currentPeriodId = openPeriodDoc.id;
       document.getElementById("submissionForm").style.display = "block";
     } else {
+      currentPeriod = null;
+      currentPeriodId = null;
       document.getElementById("submissionForm").style.display = "none";
+      document.getElementById("matchSelection").innerHTML = "";
     }
+  });
+}
+
+// Fetch book matches
+async function fetchMatches(title, author) {
+  const queryStr = `${title} ${author}`;
+  try {
+    const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
+    const data = await res.json();
+    return data.docs.map(d => ({
+      title: d.title,
+      author: d.author_name?.[0] || "",
+      coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/120x180"
+    }));
+  } catch (err) {
+    console.error(err);
+    return [];
   }
+}
 
-  // Fetch matching books
-  async function fetchMatches(title, author) {
-    const queryStr = `${title} ${author}`;
-    try {
-      const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
-      const data = await res.json();
-      return data.docs.map(d => ({
-        title: d.title,
-        author: d.author_name?.[0] || "",
-        coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/120x180"
-      }));
-    } catch (err) {
-      console.error("Error fetching book matches:", err);
-      return [];
-    }
-  }
+// Submit book
+document.getElementById("submitBookBtn").addEventListener("click", async () => {
+  if (!currentPeriodId) return alert("Submissions are not open right now.");
 
-  // Submit book
-  document.getElementById("submitBookBtn").addEventListener("click", async () => {
-    const titleInput = document.getElementById("bookTitle").value.trim();
-    const authorInput = document.getElementById("bookAuthor").value.trim();
-    if (!titleInput || !authorInput) return alert("Title and author required.");
+  const titleInput = document.getElementById("bookTitle").value.trim();
+  const authorInput = document.getElementById("bookAuthor").value.trim();
+  if (!titleInput || !authorInput) return alert("Title and author required.");
 
-    // Check if user already submitted this period
-    const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid), where("periodId", "==", currentPeriodId));
-    const existing = await getDocs(q);
-    if (!existing.empty) return alert("You already submitted a book for this period.");
+  const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid), where("periodId", "==", currentPeriodId));
+  const existing = await getDocs(q);
+  if (!existing.empty) return alert("You already submitted a book for this period.");
 
-    const matches = await fetchMatches(titleInput, authorInput);
-    if (matches.length === 0) matches.push({ title: titleInput, author: authorInput, coverUrl: "" });
+  const matches = await fetchMatches(titleInput, authorInput);
+  if (matches.length === 0) matches.push({ title: titleInput, author: authorInput, coverUrl: "" });
 
-    const container = document.getElementById("matchSelection");
-    container.innerHTML = "<h3>Select the correct match:</h3>";
-    matches.forEach(b => {
-      const div = document.createElement("div");
-      div.className = "submission-card";
-      div.innerHTML = `
-        <img src="${b.coverUrl}" class="book-cover" />
-        <div class="book-info">
-          <h3>${b.title}</h3>
-          <p>${b.author}</p>
-          <button class="btn btn-primary selectMatch">Select</button>
-        </div>
-      `;
-      container.appendChild(div);
-      div.querySelector(".selectMatch").addEventListener("click", async () => {
-        await addDoc(collection(db, "books"), {
-          title: b.title,
-          author: b.author,
-          coverUrl: b.coverUrl,
-          submittedBy: currentUser.uid,
-          periodId: currentPeriodId,
-          createdAt: serverTimestamp()
-        });
-        container.innerHTML = "<p>Book submitted!</p>";
-        loadMySubmissions();
+  const container = document.getElementById("matchSelection");
+  container.innerHTML = "<h3>Select the correct match:</h3>";
+  matches.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "submission-card";
+    div.innerHTML = `
+      <img src="${b.coverUrl}" class="book-cover" />
+      <div class="book-info">
+        <h3>${b.title}</h3>
+        <p>${b.author}</p>
+        <button class="btn btn-primary selectMatch">Select</button>
+      </div>
+    `;
+    container.appendChild(div);
+    div.querySelector(".selectMatch").addEventListener("click", async () => {
+      await addDoc(collection(db, "books"), {
+        title: b.title,
+        author: b.author,
+        coverUrl: b.coverUrl,
+        submittedBy: currentUser.uid,
+        periodId: currentPeriodId,
+        createdAt: serverTimestamp()
       });
+      container.innerHTML = "<p>Book submitted!</p>";
+      loadMySubmissions();
     });
   });
+});
 
-  // Load user's submissions
-  async function loadMySubmissions() {
-    if (!currentUser) return;
-    const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid), orderBy("createdAt", "desc"));
-    const snap = await getDocs(q);
-    const container = document.getElementById("mySubmissionsList");
-    container.innerHTML = "";
-    snap.docs.forEach(docSnap => {
-      const b = docSnap.data();
-      const div = document.createElement("div");
-      div.className = "submission-card";
-      div.innerHTML = `
-        <img src="${b.coverUrl}" class="book-cover" />
-        <div class="book-info">
-          <h3>${b.title}</h3>
-          <p>${b.author}</p>
-        </div>
-      `;
-      container.appendChild(div);
-    });
-  }
+// Load user's submissions
+async function loadMySubmissions() {
+  if (!currentUser) return;
+  const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  const container = document.getElementById("mySubmissionsList");
+  container.innerHTML = "";
+  snap.docs.forEach(docSnap => {
+        const b = docSnap.data();
+    const div = document.createElement("div");
+    div.className = "submission-card";
+    div.innerHTML = `
+      <img src="${b.coverUrl || 'https://via.placeholder.com/120x180'}" class="book-cover" />
+      <div class="book-info">
+        <h3>${b.title}</h3>
+        <p>${b.author}</p>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
 </script>
 </body>
 </html>
+
