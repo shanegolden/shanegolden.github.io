@@ -28,7 +28,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Club Dashboard</h1>
+<h1>📚 Club Dashboard!</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -220,7 +220,23 @@ async function initVoting() {
   const activePeriod = periodDoc.docs.find(d => d.id===currentPeriodId)?.data();
   if(activePeriod?.votingActive) loadVotingOptions();
 }
-initVoting();
+// Real-time listener for voting status
+  function setupVotingListener() {
+    if (!currentPeriodId) return;
+    const periodRef = doc(db, "submissionPeriods", currentPeriodId);
+  
+    onSnapshot(periodRef, (snap) => {
+      const data = snap.data();
+      if (data?.votingActive) {
+        loadVotingOptions(); // Voting started, load voting UI
+      } else {
+        document.getElementById("matchSelection").innerHTML = ""; // Clear voting UI if not active
+      }
+    });
+  }
+  
+  // Call this after currentPeriodId is set
+  setupVotingListener();;
 
 </script>
 </body>
