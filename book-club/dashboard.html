@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Book Club Dashboard</title>
 <style>
+/* Keep existing styles intact */
 body { font-family: Arial, sans-serif; background: #f5f6fa; margin:0; padding:0; }
 header { background: #1e1e2f; color:white; padding:1rem; display:flex; justify-content:space-between; align-items:center; }
 h1 { margin:0; }
@@ -30,7 +31,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Club Dashboard!</h1>
+<h1>📚 Club Dashboard</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -74,12 +75,12 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 onAuthStateChanged(auth, async (user) => {
   if(!user) return window.location.href="login.html";
   currentUser = user;
-  setupSubmissionListener();
-  loadMySubmissions();
+  await setupSubmissionListener();
+  await loadMySubmissions(); // always show history
 });
 
 // Real-time listener for submission periods
-function setupSubmissionListener() {
+async function setupSubmissionListener() {
   const periodsRef = collection(db,"submissionPeriods");
   onSnapshot(periodsRef, async (snapshot) => {
     const periods = snapshot.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>b.createdAt?.toMillis() - a.createdAt?.toMillis());
@@ -114,17 +115,16 @@ function setupSubmissionListener() {
     else if(!currentPeriod.active && !currentPeriod.votingActive) {
       sectionTitle.innerText = `Voting Closed (${currentPeriod.name})`;
       submissionForm.style.display = "none";
+      // Only display winner if any book has votes
       await displayWinner();
     }
 
-    await loadMySubmissions();
+    await loadMySubmissions(); // always reload history
   });
 }
 
-// Submit book (attach once)
+// Submit book
 document.getElementById("submitBookBtn").addEventListener("click", async () => {
-  if(!currentPeriod) return alert("No active submission period.");
-
   const title = document.getElementById("bookTitle").value.trim();
   const author = document.getElementById("bookAuthor").value.trim();
   if(!title || !author) return alert("Title and author required.");
@@ -134,14 +134,9 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
   try {
     const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
     const data = await res.json();
-    matches = data.docs.map(d=>({
-      title:d.title,
-      author:d.author_name?.[0]||"",
-      coverUrl:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:"https://via.placeholder.com/120x180"
-    }));
+    matches = data.docs.map(d=>({ title:d.title, author:d.author_name?.[0]||"", coverUrl:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:"https://via.placeholder.com/120x180" }));
   } catch(e){ console.error(e); }
-
-  if(matches.length===0) matches.push({title, author, coverUrl:"https://via.placeholder.com/120x180"});
+  if(matches.length===0) matches.push({title,author,coverUrl:"https://via.placeholder.com/120x180"});
 
   const container = document.getElementById("matchSelection");
   container.innerHTML="<h3>Select the correct match:</h3>";
@@ -208,7 +203,7 @@ async function loadVotingOptions() {
   });
 }
 
-// My submissions
+// My submissions (chronological, all time)
 async function loadMySubmissions() {
   if(!currentUser) return;
   const container = document.getElementById("mySubmissionsList");
@@ -251,12 +246,15 @@ async function loadMySubmissions() {
   });
 }
 
-// Display winner
+// Display winner only if any votes exist
 async function displayWinner() {
   const container = document.getElementById("winnerDisplay");
   const booksSnap = await getDocs(query(collection(db,"books"), where("periodId","==",currentPeriod.id)));
   const books = booksSnap.docs.map(d=>({id:d.id, ...d.data()}));
-  if(books.length===0){ container.innerText="No submissions."; return; }
+  if(books.length===0 || books.every(b=>!b.votes?.length)) {
+    container.innerText = "No winner yet";
+    return;
+  }
   const winner = books.sort((a,b)=>(b.votes?.length||0)-(a.votes?.length||0))[0];
   container.innerText = `Winner: ${winner.title} by ${winner.author} with ${winner.votes?.length||0} votes`;
 }
