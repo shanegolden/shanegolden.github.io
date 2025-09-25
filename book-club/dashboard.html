@@ -29,7 +29,7 @@
 </head>
 <body>
 <header>
-  <h1>📚 Book Club Dashboard</h1>
+  <h1>📚 Book Club Dashboard!</h1>
   <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -52,7 +52,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, query, where, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -79,7 +79,7 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 // Load user & submission period
 onAuthStateChanged(auth, async (user) => {
   if (!user) return window.location.href="login.html";
-  currentUser=user;
+  currentUser = user;
   await loadSubmissionStatus();
   await loadMySubmissions();
 });
@@ -105,7 +105,6 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
   const existing = await getDocs(q);
   if(!existing.empty) return alert("You already submitted a book for this period.");
 
-  // Fetch matches
   const queryStr = `${title} ${author}`;
   let matches=[];
   try {
@@ -134,7 +133,6 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
     `;
     container.appendChild(div);
     div.querySelector(".selectMatch").addEventListener("click", async ()=>{
-      // Add book to Firestore
       const docRef = await addDoc(collection(db,"books"),{
         title:b.title,
         author:b.author,
@@ -143,27 +141,32 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
         periodId:currentPeriodId,
         createdAt:serverTimestamp()
       });
-      // Immediately show it with edit/delete/change options
       addSubmissionToList({id: docRef.id, ...b, periodId: currentPeriodId});
       container.innerHTML="<p>Book submitted!</p>";
     });
   });
 });
 
-// Load my submissions
+// Load all my submissions
 async function loadMySubmissions() {
   if(!currentUser) return;
-  const q=query(collection(db,"books"), where("submittedBy","==",currentUser.uid), orderBy("createdAt","desc"));
-  const snap=await getDocs(q);
-  const container=document.getElementById("mySubmissionsList");
+
+  const q = query(collection(db,"books"), where("submittedBy","==",currentUser.uid));
+  const snap = await getDocs(q);
+  const container = document.getElementById("mySubmissionsList");
   container.innerHTML="";
-  for(const docSnap of snap.docs){
-    const b=docSnap.data();
-    await addSubmissionToList({id: docSnap.id, ...b});
-  }
+
+  const submissions = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+  submissions.sort((a,b) => {
+    const t1 = a.createdAt?.toMillis?.() || 0;
+    const t2 = b.createdAt?.toMillis?.() || 0;
+    return t2 - t1;
+  });
+
+  submissions.forEach(b => addSubmissionToList(b));
 }
 
-// Helper to add a submission to the UI
+// Helper to add a submission
 async function addSubmissionToList(b) {
   const container=document.getElementById("mySubmissionsList");
   const div=document.createElement("div");
@@ -180,24 +183,21 @@ async function addSubmissionToList(b) {
       </div>
     </div>
   `;
-  container.prepend(div); // newest on top
+  container.prepend(div);
 
-  // Check if the submission period is still active
+  // Check if period is active
   let periodActive = true;
   if (b.periodId) {
     try {
-      const periodDoc = await getDoc(doc(db, "submissionPeriods", b.periodId));
+      const periodDoc = await getDoc(doc(db,"submissionPeriods",b.periodId));
       periodActive = periodDoc.exists() && periodDoc.data().active;
-    } catch(e) {
-      console.error(e);
-    }
+    } catch(e){ console.error(e); }
   }
 
   if (!periodActive) {
     div.querySelector(".editBook").disabled = true;
     div.querySelector(".changeCover").disabled = true;
   } else {
-    // Edit book title/author
     div.querySelector(".editBook").addEventListener("click", async () => {
       const newTitle = prompt("Edit book title:", b.title);
       const newAuthor = prompt("Edit author:", b.author);
@@ -209,7 +209,6 @@ async function addSubmissionToList(b) {
       b.author = newAuthor;
     });
 
-    // Change cover
     div.querySelector(".changeCover").addEventListener("click", async () => {
       const queryStr = `${b.title} ${b.author}`;
       let matches = [];
@@ -222,7 +221,7 @@ async function addSubmissionToList(b) {
       } catch (e) { console.error(e); }
       if (matches.length === 0) matches.push({ coverUrl: "https://via.placeholder.com/120x180" });
 
-      const newCover = prompt(`Choose a cover number (1-${matches.length}):\n${matches.map((m, i) => `${i+1}: ${m.coverUrl}`).join("\n")}`);
+      const newCover = prompt(`Choose a cover number (1-${matches.length}):\n${matches.map((m,i)=>`${i+1}: ${m.coverUrl}`).join("\n")}`);
       const index = parseInt(newCover)-1;
       if (!matches[index]) return;
       await updateDoc(doc(db, "books", b.id), { coverUrl: matches[index].coverUrl });
