@@ -5,40 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Book Club Dashboard</title>
 <style>
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f4f6f8;
-    margin: 0;
-    padding: 0;
-  }
-  header {
-    background: linear-gradient(90deg, #4f46e5, #6366f1);
-    color: white;
-    padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  header h1 { margin: 0; font-size: 1.8rem; }
-  .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; }
-  .btn-primary { background: #4f46e5; color: white; }
-  .btn-danger { background: #e94b3c; color: white; }
-  .container { max-width: 900px; margin: 2rem auto; padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-  input { width: 100%; padding: 0.5rem; margin: 0.5rem 0; border-radius: 6px; border: 1px solid #d1d5db; }
-  .submission-card { display: flex; gap: 1rem; background: #f0f4f8; padding: 0.5rem; border-radius: 8px; margin-bottom: 1rem; align-items: center; }
-  .submission-card img.book-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 6px; }
-  .book-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
-  .match-options { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
-  .match-options .submission-card { flex-direction: column; align-items: center; width: 180px; }
-  .match-options .book-info { align-items: center; text-align: center; }
-  h2 { border-bottom: 1px solid #d1d5db; padding-bottom: 0.5rem; margin-top: 2rem; }
+  body { font-family: Arial, sans-serif; background: #f5f6fa; margin:0; padding:0; }
+  header { background: #1e1e2f; color:white; padding:1rem; display:flex; justify-content:space-between; align-items:center; }
+  h1 { margin:0; }
+  button { padding:0.5rem 1rem; margin:0.2rem; cursor:pointer; border:none; border-radius:5px; }
+  button:hover { opacity:0.9; }
+  .btn-primary { background:#4a90e2; color:white; }
+  .btn-danger { background:#e94b3c; color:white; }
+  .container { max-width:900px; margin:2rem auto; padding:1rem; background:white; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+  input { padding:0.5rem; width:100%; margin:0.5rem 0; border-radius:5px; border:1px solid #ccc; }
+  .submission-card { display:flex; gap:1rem; margin:1rem 0; background:#f0f4f8; padding:0.5rem; border-radius:8px; }
+  .submission-card img.book-cover { width:120px; height:180px; object-fit:cover; border-radius:5px; }
+  .book-info { flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+  .my-submissions { margin-top:2rem; }
+  h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
+  .match-options { display:flex; flex-wrap:wrap; gap:1rem; margin-top:1rem; }
+  .match-options .submission-card { width:200px; flex-direction:column; align-items:center; }
+  .match-options .book-info { align-items:center; text-align:center; }
 </style>
 </head>
 <body>
-
 <header>
   <h1>📚 Book Club Dashboard</h1>
-  <button id="logoutBtn" class="btn btn-danger">Logout</button>
+  <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
 <div class="container">
@@ -60,7 +49,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, query, where, addDoc, getDocs, updateDoc, doc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, addDoc, getDocs, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -76,7 +65,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let currentUser = null;
-let currentPeriod = null;
 let currentPeriodId = null;
 
 // Logout
@@ -85,68 +73,56 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
   window.location.href = "login.html";
 });
 
-// Protect page & load user
+// Load user & submission period
 onAuthStateChanged(auth, async (user) => {
-  if (!user) { window.location.href = "login.html"; return; }
-  currentUser = user;
+  if (!user) return window.location.href="login.html";
+  currentUser=user;
   await loadSubmissionStatus();
   await loadMySubmissions();
 });
 
-// Check current submission period
 async function loadSubmissionStatus() {
-  const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
-  const openPeriodDoc = periodsSnap.docs.find(p => p.data().active);
-  if (openPeriodDoc) {
-    currentPeriod = openPeriodDoc.data();
-    currentPeriodId = openPeriodDoc.id;
-    document.getElementById("submissionForm").style.display = "block";
+  const periodsSnap = await getDocs(collection(db,"submissionPeriods"));
+  const openPeriod = periodsSnap.docs.find(d=>d.data().active);
+  if(openPeriod){
+    currentPeriodId=openPeriod.id;
+    document.getElementById("submissionForm").style.display="block";
   } else {
-    currentPeriod = null;
-    currentPeriodId = null;
-    document.getElementById("submissionForm").style.display = "none";
-  }
-}
-
-// Fetch matching books from OpenLibrary
-async function fetchMatches(title, author) {
-  const queryStr = `${title} ${author}`;
-  try {
-    const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
-    const data = await res.json();
-    return data.docs.map(d => ({
-      title: d.title,
-      author: d.author_name?.[0] || "",
-      coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/120x180"
-    }));
-  } catch (err) {
-    console.error("Error fetching book matches:", err);
-    return [];
+    document.getElementById("submissionForm").style.display="none";
   }
 }
 
 // Submit book
 document.getElementById("submitBookBtn").addEventListener("click", async () => {
-  if (!currentPeriodId) { alert("No active submission period."); return; }
-  const titleInput = document.getElementById("bookTitle").value.trim();
-  const authorInput = document.getElementById("bookAuthor").value.trim();
-  if (!titleInput || !authorInput) return alert("Title and author required.");
+  const title=document.getElementById("bookTitle").value.trim();
+  const author=document.getElementById("bookAuthor").value.trim();
+  if(!title||!author) return alert("Title and author required.");
 
-  // Check if user already submitted for this period
-  const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid), where("periodId", "==", currentPeriodId));
+  const q=query(collection(db,"books"), where("submittedBy","==",currentUser.uid), where("periodId","==",currentPeriodId));
   const existing = await getDocs(q);
-  if (!existing.empty) return alert("You already submitted a book for this period.");
+  if(!existing.empty) return alert("You already submitted a book for this period.");
 
-  const matches = await fetchMatches(titleInput, authorInput);
-  if (matches.length === 0) matches.push({ title: titleInput, author: authorInput, coverUrl: "" });
+  const queryStr = `${title} ${author}`;
+  let matches=[];
+  try {
+    const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
+    const data = await res.json();
+    matches = data.docs.map(d=>({
+      title:d.title,
+      author:d.author_name?.[0]||"",
+      coverUrl:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:"https://via.placeholder.com/120x180"
+    }));
+  } catch(e){ console.error(e); }
+
+  if(matches.length===0) matches.push({title,author,coverUrl:"https://via.placeholder.com/120x180"});
 
   const container = document.getElementById("matchSelection");
-  container.innerHTML = "<h3>Select the correct match:</h3>";
-  matches.forEach(b => {
-    const div = document.createElement("div");
-    div.className = "submission-card";
-    div.innerHTML = `
-      <img src="${b.coverUrl}" class="book-cover" />
+  container.innerHTML="<h3>Select the correct match:</h3>";
+  matches.forEach(b=>{
+    const div=document.createElement("div");
+    div.className="submission-card";
+    div.innerHTML=`
+      <img src="${b.coverUrl}" class="book-cover"/>
       <div class="book-info">
         <h3>${b.title}</h3>
         <p>${b.author}</p>
@@ -154,37 +130,34 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
       </div>
     `;
     container.appendChild(div);
-    div.querySelector(".selectMatch").addEventListener("click", async () => {
-      await addDoc(collection(db, "books"), {
-        title: b.title,
-        author: b.author,
-        coverUrl: b.coverUrl,
-        submittedBy: currentUser.uid,
-        periodId: currentPeriodId,
-        createdAt: serverTimestamp()
+    div.querySelector(".selectMatch").addEventListener("click", async ()=>{
+      await addDoc(collection(db,"books"),{
+        title:b.title,
+        author:b.author,
+        coverUrl:b.coverUrl,
+        submittedBy:currentUser.uid,
+        periodId:currentPeriodId,
+        createdAt:serverTimestamp()
       });
-      container.innerHTML = "<p>Book submitted!</p>";
-      await loadMySubmissions();
+      container.innerHTML="<p>Book submitted!</p>";
+      loadMySubmissions();
     });
   });
 });
 
-// Load user's submissions for current period
+// Load my submissions
 async function loadMySubmissions() {
-  const container = document.getElementById("mySubmissionsList");
-  if (!currentUser || !currentPeriodId) { container.innerHTML = "<p>No active submission period.</p>"; return; }
-
-  const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid), where("periodId", "==", currentPeriodId));
-  const snap = await getDocs(q);
-  container.innerHTML = "";
-  if (snap.empty) { container.innerHTML = "<p>You haven't submitted a book yet for this period.</p>"; return; }
-
-  snap.docs.forEach(docSnap => {
-    const b = docSnap.data();
-    const div = document.createElement("div");
-    div.className = "submission-card";
-    div.innerHTML = `
-      <img src="${b.coverUrl || 'https://via.placeholder.com/120x180'}" class="book-cover" />
+  if(!currentUser) return;
+  const q=query(collection(db,"books"), where("submittedBy","==",currentUser.uid), orderBy("createdAt","desc"));
+  const snap=await getDocs(q);
+  const container=document.getElementById("mySubmissionsList");
+  container.innerHTML="";
+  snap.docs.forEach(docSnap=>{
+    const b=docSnap.data();
+    const div=document.createElement("div");
+    div.className="submission-card";
+    div.innerHTML=`
+      <img src="${b.coverUrl}" class="book-cover"/>
       <div class="book-info">
         <h3>${b.title}</h3>
         <p>${b.author}</p>
