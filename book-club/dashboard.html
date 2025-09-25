@@ -31,7 +31,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Club Dashboard!</h1>
+<h1>📚 Club Dashboard</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -94,27 +94,31 @@ async function setupSubmissionListener() {
     matchSelection.innerHTML = "";
     winnerDisplay.innerHTML = "";
 
-    if(!currentPeriod) {
+if(!currentPeriod) {
   sectionTitle.innerText = "No Active Submission Period";
   submissionForm.style.display = "none";
   return;
 }
 
+// Submissions open
 if(currentPeriod.active && !currentPeriod.votingActive) {
   sectionTitle.innerText = `Submit a Book (${currentPeriod.name})`;
   submissionForm.style.display = "block";
-} else if(!currentPeriod.active && currentPeriod.votingActive) {
+  matchSelection.innerHTML = "";
+  winnerDisplay.innerHTML = "";
+}
+// Voting open
+else if(currentPeriod.votingActive) {
   sectionTitle.innerText = `Voting Open (${currentPeriod.name})`;
   submissionForm.style.display = "none";
   await loadVotingOptions();
-} else if(!currentPeriod.active && !currentPeriod.votingActive && currentPeriod.votingClosed) {
-  // Only display winner if voting has officially closed
+}
+// Voting closed
+else if(!currentPeriod.active && !currentPeriod.votingActive) {
   sectionTitle.innerText = `Voting Closed (${currentPeriod.name})`;
   submissionForm.style.display = "none";
+  matchSelection.innerHTML = "";
   await displayWinner();
-}
-    await loadMySubmissions(); // always reload history
-  });
 }
 
 // Submit book
