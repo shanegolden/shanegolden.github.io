@@ -31,7 +31,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Club Dashboard</h1>
+<h1>📚 Club Dashboard!</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -179,20 +179,26 @@ async function loadVotingOptions() {
     div.className="submission-card";
     const userAlreadyVoted = b.votes?.includes(currentUser.uid);
     div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p>
-      <button class="btn btn-primary voteBtn" ${userAlreadyVoted || userVotesCount>=3 ? 'disabled' : ''}>Vote</button>
+      <button class="btn ${userAlreadyVoted || userVotesCount>=3 ? 'btn-danger' : 'btn-primary'} voteBtn" ${userAlreadyVoted || userVotesCount>=3 ? 'disabled' : ''}>
+        ${userAlreadyVoted ? 'Voted' : 'Vote'}
+      </button>
     </div>`;
     container.appendChild(div);
 
-    div.querySelector(".voteBtn").addEventListener("click", async () => {
+    const voteBtn = div.querySelector(".voteBtn");
+    voteBtn.addEventListener("click", async () => {
       if(userAlreadyVoted) return;
       if(userVotesCount>=3) return alert("You can vote for up to 3 books only.");
       await updateDoc(doc(db,"books",b.id), { votes: [...(b.votes||[]), currentUser.uid] });
-      div.querySelector(".voteBtn").disabled=true;
-      div.querySelector(".vote-info").innerText = `Votes: ${(b.votes?.length||0)+1}`;
+      voteBtn.innerText = "Voted";
+      voteBtn.classList.remove("btn-primary");
+      voteBtn.classList.add("btn-danger");
+      voteBtn.disabled = true;
       await loadVotingOptions(); // refresh for remaining votes
     });
   });
 }
+
 
 // My submissions (chronological, all time)
 async function loadMySubmissions() {
