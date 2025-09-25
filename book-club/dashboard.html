@@ -95,24 +95,24 @@ async function setupSubmissionListener() {
     winnerDisplay.innerHTML = "";
 
     if(!currentPeriod) {
-      sectionTitle.innerText = "No Active Submission Period";
-      submissionForm.style.display = "none";
-      return;
-    }
+  sectionTitle.innerText = "No Active Submission Period";
+  submissionForm.style.display = "none";
+  return;
+}
 
-    if(currentPeriod.active && !currentPeriod.votingActive) {
-      sectionTitle.innerText = `Submit a Book (${currentPeriod.name})`;
-      submissionForm.style.display = "block";
-    } else if(!currentPeriod.active && currentPeriod.votingActive) {
-      sectionTitle.innerText = `Voting Open (${currentPeriod.name})`;
-      submissionForm.style.display = "none";
-      await loadVotingOptions();
-    } else if(!currentPeriod.active && !currentPeriod.votingActive) {
-      sectionTitle.innerText = `Voting Closed (${currentPeriod.name})`;
-      submissionForm.style.display = "none";
-      await displayWinner();
-    }
-
+if(currentPeriod.active && !currentPeriod.votingActive) {
+  sectionTitle.innerText = `Submit a Book (${currentPeriod.name})`;
+  submissionForm.style.display = "block";
+} else if(!currentPeriod.active && currentPeriod.votingActive) {
+  sectionTitle.innerText = `Voting Open (${currentPeriod.name})`;
+  submissionForm.style.display = "none";
+  await loadVotingOptions();
+} else if(!currentPeriod.active && !currentPeriod.votingActive && currentPeriod.votingClosed) {
+  // Only display winner if voting has officially closed
+  sectionTitle.innerText = `Voting Closed (${currentPeriod.name})`;
+  submissionForm.style.display = "none";
+  await displayWinner();
+}
     await loadMySubmissions(); // always reload history
   });
 }
