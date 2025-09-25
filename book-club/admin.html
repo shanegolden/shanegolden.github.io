@@ -32,6 +32,8 @@ input, select { padding:8px; margin:5px 0; width:100%; max-width:400px; }
 </header>
 
 <main>
+<h2>Create / Toggle Book Submissions</h2>
+<input id="newPeriodName" placeholder="Submission Period Name (required)">
 <button id="toggleSubmissionsBtn" class="primary"></button>
 
 <h2>Submission Periods</h2>
@@ -77,12 +79,10 @@ document.getElementById("logoutBtn").addEventListener("click", async ()=>{
   window.location.href="login.html";
 });
 
-// ------------- Protect Admin Page -------------
+// Protect Admin Page
 onAuthStateChanged(auth, async user=>{
   if(!user) window.location.href="login.html";
   currentUser=user;
-
-  // Check if admin
   const membersSnap = await getDocs(collection(db,"members"));
   members = membersSnap.docs.map(d=>({id:d.id,...d.data()}));
   const admin = members.find(m=>m.id===user.uid && m.role==="admin");
@@ -92,7 +92,7 @@ onAuthStateChanged(auth, async user=>{
   loadMemberSelect();
 });
 
-// ------------- Real-time Submission Periods & Toggle Button -------------
+// Real-time Submission Periods & Toggle Button
 function listenSubmissionPeriods(){
   onSnapshot(collection(db,"submissionsPeriods"), snapshot=>{
     activePeriod=null;
@@ -111,11 +111,14 @@ document.getElementById("toggleSubmissionsBtn").addEventListener("click", async 
   if(activePeriod){
     await updateDoc(doc(db,"submissionsPeriods",activePeriod.id),{active:false});
   }else{
-    await addDoc(collection(db,"submissionsPeriods"),{active:true, createdAt:serverTimestamp()});
+    const name=document.getElementById("newPeriodName").value.trim();
+    if(!name){ alert("Enter a name for the submission period"); return; }
+    await addDoc(collection(db,"submissionsPeriods"),{active:true,name:name, createdAt:serverTimestamp()});
+    document.getElementById("newPeriodName").value="";
   }
 });
 
-// ------------- Load Submission Periods -------------
+// Load Submission Periods
 async function loadPeriods(periodDocs){
   const container=document.getElementById("periodsContainer");
   container.innerHTML="";
@@ -125,7 +128,7 @@ async function loadPeriods(periodDocs){
     const card=document.createElement("div");
     card.className="period-card";
     const timestamp=data.createdAt?.toDate().toLocaleString()||new Date().toLocaleString();
-    card.innerHTML=`<h3>${timestamp}</h3>`;
+    card.innerHTML=`<h3>${data.name} (${timestamp})</h3>`;
     const btn=document.createElement("button"); btn.innerText="See Submissions"; btn.className="secondary";
     btn.addEventListener("click",()=>loadBooksForPeriod(period.id,card));
     card.appendChild(btn);
@@ -133,7 +136,7 @@ async function loadPeriods(periodDocs){
   });
 }
 
-// ------------- Load Books per Period -------------
+// Load Books per Period
 async function loadBooksForPeriod(periodId,card){
   let existing = card.querySelector(".booksContainer");
   if(existing){ existing.remove(); return; }
@@ -164,13 +167,11 @@ async function loadBooksForPeriod(periodId,card){
   card.appendChild(booksContainer);
 }
 
-// ------------- Edit Book Inline -------------
+// Edit Book Inline
 function showEditOptions(card,bookId,data){
   card.innerHTML=`<img src="${data.coverUrl||''}"><div class="info"><strong>${data.title}</strong><br>by ${data.author}</div>`;
   const altDiv=document.createElement("div"); altDiv.className="alternatives"; card.appendChild(altDiv);
-
-  // Example: alternative matches could be fetched via API (placeholder)
-  const alternatives=[data]; // replace with API fetch for real matches
+  const alternatives=[data]; // placeholder for real API matches
   alternatives.forEach(alt=>{
     const option=document.createElement("div");
     option.innerHTML=`<img src="${alt.coverUrl||''}"><span>${alt.title} by ${alt.author}</span>`;
@@ -182,7 +183,7 @@ function showEditOptions(card,bookId,data){
   });
 }
 
-// ------------- Add Book for Member -------------
+// Add Book for Member
 function loadMemberSelect(){
   const sel=document.getElementById("memberSelect");
   const perSel=document.getElementById("submissionPeriodSelect");
@@ -192,7 +193,7 @@ function loadMemberSelect(){
     perSel.innerHTML="";
     snap.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0)).forEach(d=>{
       const opt=document.createElement("option");
-      const ts=d.data().createdAt?.toDate().toLocaleString()||new Date().toLocaleString();
+      const ts=d.data().name || (d.data().createdAt?.toDate().toLocaleString()||new Date().toLocaleString());
       opt.value=d.id; opt.innerText=ts; perSel.appendChild(opt);
     });
   });
@@ -209,7 +210,6 @@ document.getElementById("addBookBtn").addEventListener("click", async ()=>{
   document.getElementById("bookMessage").innerText="Book added successfully!";
   document.getElementById("bookTitle").value=""; document.getElementById("bookAuthor").value=""; document.getElementById("bookISBN").value="";
 });
-
 </script>
 </body>
 </html>
