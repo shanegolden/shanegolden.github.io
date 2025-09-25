@@ -179,9 +179,43 @@ async function loadSubmissionPeriods() {
         });
 
         // Edit book (inline placeholder)
-        subCard.querySelector(".editBook").addEventListener("click", () => {
-          alert("Inline edit match / cover art placeholder.");
+       subCard.querySelector(".editBook").addEventListener("click", async () => {
+        const queryStr = `${b.title} ${b.author}`;
+        const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
+        const data = await res.json();
+        const matches = data.docs.map(d => ({
+          title: d.title,
+          author: d.author_name?.[0] || "",
+          coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/100x150"
+        }));
+        const editDiv = document.createElement("div");
+        editDiv.innerHTML = "<h4>Select a new match:</h4>";
+        matches.forEach((m) => {
+          const mDiv = document.createElement("div");
+          mDiv.className = "submission-card";
+          mDiv.innerHTML = `
+            <img src="${m.coverUrl}" class="book-cover" />
+            <div class="book-info">
+              <h3>${m.title}</h3>
+              <p>${m.author}</p>
+              <button class="btn selectMatch">Select</button>
+            </div>
+          `;
+          editDiv.appendChild(mDiv);
+          mDiv.querySelector(".selectMatch").addEventListener("click", async () => {
+            await updateDoc(doc(db, "books", bookDoc.id), {
+              title: m.title,
+              author: m.author,
+              coverUrl: m.coverUrl
+            });
+            subCard.querySelector(".book-cover").src = m.coverUrl;
+            subCard.querySelector(".book-info h3").innerText = m.title;
+            subCard.querySelector(".book-info p").innerText = m.author;
+            editDiv.remove();
+          });
         });
+        subCard.appendChild(editDiv);
+      });
       });
     });
 
