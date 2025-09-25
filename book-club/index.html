@@ -1,275 +1,191 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Book Club</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background-color: #f5f5f5;
-      color: #333;
-    }
-
-    header {
-      width: 100%;
-      padding: 1rem;
-      background-color: #4a90e2;
-      color: #fff;
-      text-align: center;
-      font-size: 1.5rem;
-    }
-
-    main {
-      max-width: 500px;
-      width: 90%;
-      margin-top: 2rem;
-      background-color: #fff;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    h2 {
-      margin-top: 0;
-      text-align: center;
-    }
-
-    .book-info {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-
-    .book-info img {
-      max-width: 100%;
-      border-radius: 6px;
-      margin-bottom: 1rem;
-    }
-
-    input {
-      width: 100%;
-      padding: 0.7rem;
-      margin: 0.5rem 0;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
-    }
-
-    button {
-      width: 100%;
-      padding: 0.7rem;
-      background-color: #4a90e2;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: 1rem;
-      cursor: pointer;
-      margin-top: 0.5rem;
-    }
-
-    button:hover {
-      background-color: #357abd;
-    }
-
-    p.message {
-      text-align: center;
-      color: red;
-      margin-top: 1rem;
-    }
-
-    .login-signup-tabs {
-      display: flex;
-      justify-content: space-around;
-      margin-bottom: 1rem;
-      cursor: pointer;
-    }
-
-    .login-signup-tabs div {
-      padding: 0.5rem 1rem;
-      border-bottom: 2px solid transparent;
-    }
-
-    .login-signup-tabs .active {
-      border-bottom: 2px solid #4a90e2;
-      font-weight: bold;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Book Club</title>
+<style>
+  body { font-family: Arial, sans-serif; background:#f5f6fa; margin:0; padding:0; }
+  header { background:#1e1e2f; color:white; padding:1rem; text-align:center; }
+  h1 { margin:0 0 0.5rem 0; }
+  .container { max-width:900px; margin:2rem auto; padding:1rem; background:white; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+  .book-card { display:flex; flex-direction:column; align-items:center; text-align:center; gap:0.5rem; padding:1rem; border-radius:8px; background:#f0f4f8; }
+  .book-card img { max-width:150px; height:auto; border-radius:5px; }
+  form { display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem; }
+  input { padding:0.5rem; border-radius:5px; border:1px solid #ccc; width:100%; box-sizing:border-box; }
+  button { padding:0.5rem 1rem; border:none; border-radius:5px; cursor:pointer; background:#4a90e2; color:white; font-weight:bold; }
+  button:hover { opacity:0.9; }
+  .message { color:red; margin-top:0.5rem; }
+  @media(max-width:600px){
+    .book-card img { max-width:120px; }
+  }
+</style>
 </head>
 <body>
-  <header>📚 Welcome to the Book Club</header>
-  <main>
-    <div class="book-info" id="bookInfo">
-      <h2>Most Recent Winning Book</h2>
-      <p>Loading book info...</p>
-    </div>
 
-    <div class="login-signup-tabs">
-      <div id="tabSignup" class="active">Sign Up</div>
-      <div id="tabLogin">Log In</div>
-    </div>
+<header>
+  <h1>📚 Club</h1>
+  <p>Check out the most recent winning book and join our club!</p>
+</header>
 
-    <div id="authForm">
-      <!-- Signup or Login form will be rendered here -->
-    </div>
+<div class="container">
+  <div id="bookInfo"><p>Loading recent book...</p></div>
 
-    <p class="message" id="message"></p>
-  </main>
+  <div id="authForms">
+    <h2>Sign Up</h2>
+    <input id="name" placeholder="Full name" />
+    <input id="email" placeholder="Email" />
+    <input id="password" placeholder="Password" type="password" />
+    <button id="signupBtn">Sign Up</button>
+    <p class="message" id="signupMessage"></p>
+
+    <h2>Log In</h2>
+    <input id="loginEmail" placeholder="Email" />
+    <input id="loginPassword" placeholder="Password" type="password" />
+    <button id="loginBtn">Log In</button>
+    <p class="message" id="loginMessage"></p>
+  </div>
+</div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
-    authDomain: "book-club-f42b1.firebaseapp.com",
-    projectId: "book-club-f42b1",
-    storageBucket: "book-club-f42b1.appspot.com",
-    messagingSenderId: "85630091573",
-    appId: "1:85630091573:web:427077f1351140fc278c7c",
-    measurementId: "G-8BD4H79Z5Q"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
+  authDomain: "book-club-f42b1.firebaseapp.com",
+  projectId: "book-club-f42b1",
+  storageBucket: "book-club-f42b1.appspot.com",
+  messagingSenderId: "85630091573",
+  appId: "1:85630091573:web:427077f1351140fc278c7c",
+  measurementId: "G-8BD4H79Z5Q"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-  const bookInfoDiv = document.getElementById("bookInfo");
-  const authFormDiv = document.getElementById("authForm");
-  const messageP = document.getElementById("message");
-  const tabSignup = document.getElementById("tabSignup");
-  const tabLogin = document.getElementById("tabLogin");
+const bookInfoDiv = document.getElementById("bookInfo");
+const signupMessage = document.getElementById("signupMessage");
+const loginMessage = document.getElementById("loginMessage");
 
-  // Render the most recent winning book
-  async function loadRecentBook() {
-    try {
-      const booksQuery = query(collection(db, "books"), orderBy("votingDate", "desc"), limit(1));
-      const booksSnap = await getDocs(booksQuery);
-      if (!booksSnap.empty) {
-        const book = booksSnap.docs[0].data();
-        bookInfoDiv.innerHTML = `
-          <h2>${book.title}</h2>
-          <p><strong>Author:</strong> ${book.author}</p>
-          <p><strong>Year:</strong> ${book.year}</p>
-          <p><strong>Pages:</strong> ${book.pages}</p>
-          <img src="${book.coverURL}" alt="${book.title} cover" />
-          <p>${book.description}</p>
-        `;
-      } else {
-        bookInfoDiv.innerHTML = `<p>No books have been voted on yet.</p>`;
-      }
-    } catch (err) {
-      console.error(err);
-      bookInfoDiv.innerHTML = `<p>Error loading book info</p>`;
+// Load recent winner
+async function loadRecentBook() {
+  try {
+    const periodsSnap = await getDocs(collection(db,"submissionPeriods"));
+    const periods = periodsSnap.docs.map(d=>({id:d.id,...d.data()}))
+                          .sort((a,b)=>b.createdAt?.toMillis() - a.createdAt?.toMillis());
+    const latestPeriod = periods[0];
+    if(!latestPeriod){
+      bookInfoDiv.innerHTML = "<p>No books have been voted on yet.</p>";
+      return;
     }
-  }
 
-  loadRecentBook();
+    const booksSnap = await getDocs(query(collection(db,"books"), where("periodId","==",latestPeriod.id)));
+    const books = booksSnap.docs.map(d=>({id:d.id,...d.data()}));
+    if(books.length===0 || books.every(b=>!b.votes?.length)){
+      bookInfoDiv.innerHTML = "<p>No winner yet for the most recent period.</p>";
+      return;
+    }
 
-  // Render signup form
-  function renderSignup() {
-    authFormDiv.innerHTML = `
-      <input id="name" placeholder="Full name" />
-      <input id="email" placeholder="Email" />
-      <input id="password" placeholder="Password" type="password" />
-      <button id="signupBtn">Sign Up</button>
+    const winner = books.sort((a,b)=>(b.votes?.length||0)-(a.votes?.length||0))[0];
+
+    let details = {};
+    try {
+      const res = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(winner.title)}&author=${encodeURIComponent(winner.author)}&limit=1`);
+      const data = await res.json();
+      if(data.docs && data.docs.length>0){
+        const doc = data.docs[0];
+        details.year = doc.first_publish_year || "Unknown";
+        details.pages = doc.number_of_pages_median || "Unknown";
+        details.description = doc.subtitle || doc.text?.slice(0,200)?.join(" ") || "No description available";
+      } else {
+        details = {year:"Unknown", pages:"Unknown", description:"No description available"};
+      }
+    } catch(err){
+      console.error(err);
+      details = {year:"Unknown", pages:"Unknown", description:"No description available"};
+    }
+
+    bookInfoDiv.innerHTML = `
+      <div class="book-card">
+        <img src="${winner.coverUrl}" alt="${winner.title} cover" />
+        <h3>${winner.title}</h3>
+        <p><strong>Author:</strong> ${winner.author}</p>
+        <p><strong>Year Published:</strong> ${details.year}</p>
+        <p><strong>Pages:</strong> ${details.pages}</p>
+        <p style="font-size:0.9rem;">${details.description}</p>
+        <p><strong>Votes:</strong> ${winner.votes?.length || 0}</p>
+      </div>
     `;
-    messageP.innerText = "";
+  } catch(err){
+    console.error("Error loading recent book:", err);
+    bookInfoDiv.innerHTML = "<p>Error loading book info</p>";
+  }
+}
 
-    document.getElementById("signupBtn").addEventListener("click", async () => {
-      const name = document.getElementById("name").value.trim();
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
+// Sign up
+document.getElementById("signupBtn").addEventListener("click", async () => {
+  const name = document.getElementById("name").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
 
-      if (!name || !email || !password) {
-        messageP.innerText = "Please fill all fields.";
-        return;
-      }
-
-      try {
-        const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        const uid = userCred.user.uid;
-
-        await setDoc(doc(db, "members", uid), {
-          name,
-          email,
-          approved: false,
-          role: "member",
-          appliedAt: new Date()
-        });
-
-        messageP.innerText = "Signup successful! Waiting for admin approval.";
-      } catch (err) {
-        console.error(err);
-        messageP.innerText = err.message;
-      }
-    });
+  if(!name || !email || !password){
+    signupMessage.innerText = "Please fill in all fields.";
+    return;
   }
 
-  // Render login form
-  function renderLogin() {
-    authFormDiv.innerHTML = `
-      <input id="loginEmail" placeholder="Email" />
-      <input id="loginPassword" placeholder="Password" type="password" />
-      <button id="loginBtn">Log In</button>
-    `;
-    messageP.innerText = "";
-
-    document.getElementById("loginBtn").addEventListener("click", async () => {
-      const email = document.getElementById("loginEmail").value.trim();
-      const password = document.getElementById("loginPassword").value;
-
-      try {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        const uid = cred.user.uid;
-
-        const memberSnap = await getDoc(doc(db, "members", uid));
-        if (!memberSnap.exists()) {
-          await signOut(auth);
-          messageP.innerText = "No membership application found. Please apply first.";
-          return;
-        }
-
-        const data = memberSnap.data();
-        if (!data.approved) {
-          await signOut(auth);
-          messageP.innerText = "Your application is still pending approval.";
-          return;
-        }
-
-        // Redirect based on role
-        if (data.role === "admin") {
-          window.location.href = "admin.html";
-        } else {
-          window.location.href = "dashboard.html";
-        }
-      } catch (err) {
-        console.error(err);
-        messageP.innerText = err.message;
-      }
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth,email,password);
+    const uid = userCredential.user.uid;
+    // create member document
+    await setDoc(doc(db,"members",uid), {
+      name, email, approved:false, role:"member", appliedAt:new Date()
     });
+    signupMessage.innerText = "Signup successful! Waiting for admin approval.";
+  } catch(err){
+    console.error(err);
+    signupMessage.innerText = err.message;
   }
+});
 
-  // Tabs logic
-  tabSignup.addEventListener("click", () => {
-    tabSignup.classList.add("active");
-    tabLogin.classList.remove("active");
-    renderSignup();
-  });
+// Log in
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
 
-  tabLogin.addEventListener("click", () => {
-    tabLogin.classList.add("active");
-    tabSignup.classList.remove("active");
-    renderLogin();
-  });
+  try {
+    const cred = await signInWithEmailAndPassword(auth,email,password);
+    const uid = cred.user.uid;
 
-  // Default load signup
-  renderSignup();
+    const memberSnap = await getDocs(doc(db,"members",uid));
+    if(!memberSnap.exists()){
+      await signOut(auth);
+      loginMessage.innerText = "No membership application found. Please apply first.";
+      return;
+    }
+    const data = memberSnap.data();
+    if(!data.approved){
+      await signOut(auth);
+      loginMessage.innerText = "Your application is still pending approval.";
+      return;
+    }
+
+    if(data.role==="admin"){
+      window.location.href="admin.html";
+    } else {
+      window.location.href="dashboard.html";
+    }
+  } catch(err){
+    console.error(err);
+    loginMessage.innerText = err.message;
+  }
+});
+
+// Initialize
+loadRecentBook();
 </script>
+
 </body>
 </html>
