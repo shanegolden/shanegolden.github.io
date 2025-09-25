@@ -1,44 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin Panel - Book Club</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background:#f5f5f5; }
-    h1 { color:#333; }
-    button { margin:5px; padding:8px 12px; cursor:pointer; }
-    .section { background:white; padding:15px; margin-bottom:20px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
-    .book-card { display:flex; align-items:center; margin:10px 0; }
-    .book-card img { width:80px; height:120px; object-fit:cover; margin-right:10px; border-radius:4px; }
-    .book-actions button { margin-left:5px; }
-    .submission-period { border:1px solid #ccc; padding:10px; border-radius:6px; margin-bottom:10px; }
-    .submissions-list { margin-left:20px; margin-top:10px; }
-    input { padding:5px; margin-right:5px; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Book Club Admin Panel</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 0;
+  }
+  header {
+    background: linear-gradient(90deg, #4f46e5, #6366f1);
+    color: white;
+    padding: 2rem;
+    text-align: center;
+    font-size: 1.8rem;
+    font-weight: bold;
+  }
+  main {
+    padding: 2rem;
+    max-width: 1000px;
+    margin: auto;
+  }
+  h2 {
+    color: #1f2937;
+    margin-top: 2rem;
+  }
+  .btn {
+    background: #4f46e5;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 0.2rem;
+  }
+  .btn:hover {
+    background: #6366f1;
+  }
+  input {
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    margin-right: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .period-card, .submission-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  .submission-card {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    transition: transform 0.2s ease;
+  }
+  .submission-card:hover {
+    transform: translateY(-2px);
+  }
+  .book-cover {
+    width: 100px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .book-info {
+    flex-grow: 1;
+  }
+  .book-info h3 {
+    margin: 0;
+    font-size: 1.2rem;
+  }
+  .book-info p {
+    margin: 0.3rem 0;
+    color: #4b5563;
+  }
+  .edit-section {
+    margin-top: 0.5rem;
+  }
+  select {
+    padding: 0.4rem;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    margin-right: 0.5rem;
+  }
+</style>
 </head>
 <body>
-  <h1>📚 Admin Panel!!</h1>
+<header>📚 Admin Panel</header>
+<main>
 
-  <!-- Submission Period Controls -->
-  <div class="section">
-    <h2>Manage Submission Periods</h2>
-    <input id="newPeriodName" placeholder="Submission Period Name" />
-    <button id="createPeriodBtn">Create Submission Period</button>
-    <div id="periodsContainer"></div>
-  </div>
+  <!-- Submission Period Control -->
+  <h2>Manage Submission Periods</h2>
+  <input id="periodName" placeholder="Enter submission period name" />
+  <button id="toggleSubmission" class="btn">Start Book Submissions</button>
+  <div id="periodMessage"></div>
 
-  <!-- Pending Members Section -->
-  <div class="section">
-    <h2>Pending Members</h2>
-    <div id="pendingMembers"></div>
-  </div>
+  <!-- Submission Periods List -->
+  <div id="submissionPeriodsList"></div>
 
-  <script type="module">
+</main>
+
+<script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { 
-  getFirestore, collection, doc, addDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, onSnapshot, query, orderBy 
+import {
+  getFirestore, collection, getDocs, doc, updateDoc, addDoc, deleteDoc, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -47,147 +120,127 @@ const firebaseConfig = {
   projectId: "book-club-f42b1",
   storageBucket: "book-club-f42b1.appspot.com",
   messagingSenderId: "85630091573",
-  appId: "1:85630091573:web:427077f1351140fc278c7c",
-  measurementId: "G-8BD4H79Z5Q"
+  appId: "1:85630091573:web:427077f1351140fc278c7c"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const adminUID = "sog7PT2TXTTqqXQFvG2j63blC6f1"; // your admin UID
+let currentUser = null;
+let submissionOpen = false;
 
-// Protect page
-onAuthStateChanged(auth, async (user) => {
-  if (!user || user.uid !== adminUID) {
-    alert("Admin access only.");
-    signOut(auth);
-    window.location.href = "login.html";
+// Load all submission periods
+async function loadSubmissionPeriods() {
+  const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
+  const container = document.getElementById("submissionPeriodsList");
+  container.innerHTML = "";
+  periodsSnap.docs.sort((a, b) => b.data().createdAt?.toMillis() - a.data().createdAt?.toMillis())
+    .forEach(docSnap => {
+    const period = docSnap.data();
+    const card = document.createElement("div");
+    card.className = "period-card";
+    card.innerHTML = `
+      <h3>${period.name || 'Unnamed Period'} ${period.active ? '(Open)' : '(Closed)'}</h3>
+      <button class="btn seeSubmissions">See Submissions</button>
+      <button class="btn editPeriod">Edit Name</button>
+      <button class="btn deletePeriod">Delete Period</button>
+      <div class="submissionsList" style="margin-top:1rem;"></div>
+    `;
+    container.appendChild(card);
+
+    // See submissions
+    card.querySelector(".seeSubmissions").addEventListener("click", async () => {
+      const submissionsListDiv = card.querySelector(".submissionsList");
+      submissionsListDiv.innerHTML = "";
+      const submissionsSnap = await getDocs(query(collection(db, "books"), where("periodId", "==", docSnap.id)));
+      submissionsSnap.forEach(bookDoc => {
+        const b = bookDoc.data();
+        const subCard = document.createElement("div");
+        subCard.className = "submission-card";
+        subCard.innerHTML = `
+          <img src="${b.coverUrl || 'https://via.placeholder.com/100x150'}" class="book-cover"/>
+          <div class="book-info">
+            <h3>${b.title}</h3>
+            <p>${b.author}</p>
+            <p>By: ${b.submittedBy}</p>
+            <div class="edit-section">
+              <button class="btn editBook">Edit</button>
+              <button class="btn deleteBook">Delete</button>
+            </div>
+          </div>
+        `;
+        submissionsListDiv.appendChild(subCard);
+
+        // Delete book
+        subCard.querySelector(".deleteBook").addEventListener("click", async () => {
+          await deleteDoc(doc(db, "books", bookDoc.id));
+          subCard.remove();
+        });
+
+        // Edit book (inline placeholder)
+        subCard.querySelector(".editBook").addEventListener("click", () => {
+          alert("Inline edit match / cover art placeholder.");
+        });
+      });
+    });
+
+    // Edit period name
+    card.querySelector(".editPeriod").addEventListener("click", async () => {
+      const newName = prompt("Enter new period name", period.name);
+      if (newName) {
+        await updateDoc(doc(db, "submissionPeriods", docSnap.id), { name: newName });
+        loadSubmissionPeriods();
+      }
+    });
+
+    // Delete period
+    card.querySelector(".deletePeriod").addEventListener("click", async () => {
+      await deleteDoc(doc(db, "submissionPeriods", docSnap.id));
+      loadSubmissionPeriods();
+    });
+  });
+}
+
+// Toggle submission period open/close
+document.getElementById("toggleSubmission").addEventListener("click", async () => {
+  const nameInput = document.getElementById("periodName").value.trim();
+  if (!submissionOpen && !nameInput) {
+    document.getElementById("periodMessage").innerText = "Please enter a name for the submission period.";
+    return;
+  }
+  
+  const periodsRef = collection(db, "submissionPeriods");
+  // Close any active period
+  const periodsSnap = await getDocs(periodsRef);
+  for (const d of periodsSnap.docs) {
+    if (d.data().active) {
+      await updateDoc(doc(db, "submissionPeriods", d.id), { active: false });
+    }
+  }
+
+  if (!submissionOpen) {
+    // Start new period
+    await addDoc(periodsRef, { name: nameInput, active: true, createdAt: serverTimestamp() });
+    submissionOpen = true;
+    document.getElementById("toggleSubmission").innerText = "Close Book Submissions";
+    document.getElementById("periodName").value = "";
   } else {
-    loadPendingMembers();
+    submissionOpen = false;
+    document.getElementById("toggleSubmission").innerText = "Start Book Submissions";
+  }
+
+  loadSubmissionPeriods();
+});
+
+// Auth
+onAuthStateChanged(auth, async (user) => {
+  if (!user) window.location.href = "login.html";
+  else {
+    currentUser = user;
     loadSubmissionPeriods();
   }
 });
-
-// Pending Members
-async function loadPendingMembers() {
-  const membersSnap = await getDocs(collection(db, "members"));
-  const pendingMembers = membersSnap.docs.filter(d => !d.data().approved && d.data().role !== "admin");
-  const container = document.getElementById("pendingMembers");
-  container.innerHTML = "";
-  if(pendingMembers.length === 0) container.innerHTML = "<p>No pending members.</p>";
-
-  pendingMembers.forEach(docSnap => {
-    const data = docSnap.data();
-    const div = document.createElement("div");
-    div.innerHTML = `${data.name || "(No Name)"} (${data.email}) 
-      <button class="approveBtn">Approve</button> 
-      <button class="denyBtn">Deny</button>`;
-    container.appendChild(div);
-
-    div.querySelector(".approveBtn").addEventListener("click", async () => {
-      await updateDoc(doc(db, "members", docSnap.id), { approved:true });
-      div.remove();
-    });
-    div.querySelector(".denyBtn").addEventListener("click", async () => {
-      await deleteDoc(doc(db, "members", docSnap.id));
-      div.remove();
-    });
-  });
-}
-
-// Submission Periods
-const periodsContainer = document.getElementById("periodsContainer");
-
-document.getElementById("createPeriodBtn").addEventListener("click", async () => {
-  const name = document.getElementById("newPeriodName").value.trim();
-  if(!name) return;
-  await addDoc(collection(db,"submissionsPeriods"),{name,active:false,createdAt:serverTimestamp()});
-  document.getElementById("newPeriodName").value = "";
-});
-
-function loadSubmissionPeriods(){
-  const q = query(collection(db,"submissionsPeriods"), orderBy("createdAt","desc"));
-  onSnapshot(q, (snap) => {
-    periodsContainer.innerHTML = "";
-    snap.docs.forEach(docSnap => {
-      const data = docSnap.data();
-      const div = document.createElement("div");
-      div.className = "submission-period";
-      div.innerHTML = `
-        <strong>${data.name || "(Unnamed)"}</strong> 
-        <button class="toggleBtn">${data.active ? "Close Submissions" : "Start Submissions"}</button>
-        <button class="editBtn">Edit Name</button>
-        <button class="deleteBtn">Delete Period</button>
-        <button class="seeSubsBtn">See Submissions</button>
-        <div class="submissions-list" style="display:none;"></div>
-      `;
-      periodsContainer.appendChild(div);
-
-      const toggleBtn = div.querySelector(".toggleBtn");
-      toggleBtn.addEventListener("click", async ()=>{
-        await updateDoc(doc(db,"submissionsPeriods",docSnap.id),{active:!data.active});
-      });
-
-      const editBtn = div.querySelector(".editBtn");
-      editBtn.addEventListener("click", async ()=>{
-        const newName = prompt("Enter new name for this period:",data.name);
-        if(newName) await updateDoc(doc(db,"submissionsPeriods",docSnap.id),{name:newName});
-      });
-
-      const deleteBtn = div.querySelector(".deleteBtn");
-      deleteBtn.addEventListener("click", async ()=>{
-        // Delete all books in this period first
-        const booksSnap = await getDocs(collection(db,"books"));
-        for(let b of booksSnap.docs){
-          if(b.data().submissionPeriodId === docSnap.id) await deleteDoc(doc(db,"books",b.id));
-        }
-        await deleteDoc(doc(db,"submissionsPeriods",docSnap.id));
-      });
-
-      const seeSubsBtn = div.querySelector(".seeSubsBtn");
-      const submissionsList = div.querySelector(".submissions-list");
-      seeSubsBtn.addEventListener("click", async ()=>{
-        submissionsList.style.display = submissionsList.style.display==="none"?"block":"none";
-        if(submissionsList.style.display==="block"){
-          submissionsList.innerHTML = "";
-          const booksSnap = await getDocs(collection(db,"books"));
-          booksSnap.docs
-            .filter(b=>b.data().submissionPeriodId===docSnap.id)
-            .forEach(b => {
-              const book = b.data();
-              const userSnap = await getDocs(doc(db,"members",book.submittedBy)).catch(()=>null);
-              const userName = userSnap?.data()?.name || book.submittedBy;
-              const bookDiv = document.createElement("div");
-              bookDiv.className="book-card";
-              bookDiv.innerHTML = `
-                <img src="${book.coverUrl||''}" />
-                <div>
-                  <strong>${book.title}</strong><br/>
-                  ${book.author}<br/>
-                  by: ${userName}<br/>
-                  <button class="editBookBtn">Edit</button>
-                  <button class="deleteBookBtn">Delete</button>
-                </div>
-              `;
-              submissionsList.appendChild(bookDiv);
-
-              bookDiv.querySelector(".deleteBookBtn").addEventListener("click",async ()=>{
-                await deleteDoc(doc(db,"books",b.id));
-                bookDiv.remove();
-              });
-
-              bookDiv.querySelector(".editBookBtn").addEventListener("click",async ()=>{
-                const newTitle = prompt("Enter new title:",book.title);
-                const newAuthor = prompt("Enter new author:",book.author);
-                await updateDoc(doc(db,"books",b.id),{title:newTitle,author:newAuthor});
-              });
-            });
-        }
-      });
-    });
-  });
-}
-  </script>
+</script>
 </body>
 </html>
