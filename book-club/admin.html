@@ -24,7 +24,7 @@
 </style>
 </head>
 <body>
-<header>📚 Admin Panel</header>
+<header>📚 Admin Panel!</header>
 <main>
 
   <!-- Pending Member Requests -->
@@ -63,21 +63,21 @@ const db = getFirestore(app);
 let currentUser = null;
 let submissionOpen = false;
 
-// Real-time Pending Member Requests
+// Real-time Pending Member Requests (fixed for "members" collection)
 function subscribeToMemberRequests() {
   const requestsList = document.getElementById("memberRequestsList");
-  const q = query(collection(db, "users"), where("status", "==", "pending"));
+  const q = query(collection(db, "members"), where("approved", "==", false));
 
   return onSnapshot(q, (snapshot) => {
     requestsList.innerHTML = ""; // Clear old
     snapshot.forEach(docSnap => {
-      const user = docSnap.data();
+      const member = docSnap.data();
       const card = document.createElement("div");
       card.className = "submission-card";
       card.innerHTML = `
         <div class="book-info">
-          <h3>${user.name || "Unnamed User"}</h3>
-          <p>${user.email}</p>
+          <h3>${member.name || "Unnamed User"}</h3>
+          <p>${member.email}</p>
           <div class="edit-section">
             <button class="btn approveBtn">Approve</button>
             <button class="btn denyBtn">Deny</button>
@@ -88,12 +88,12 @@ function subscribeToMemberRequests() {
 
       // Approve member
       card.querySelector(".approveBtn").addEventListener("click", async () => {
-        await updateDoc(doc(db,"users",docSnap.id), { status: "approved" });
+        await updateDoc(doc(db,"members",docSnap.id), { approved: true });
       });
 
       // Deny member
       card.querySelector(".denyBtn").addEventListener("click", async () => {
-        await updateDoc(doc(db,"users",docSnap.id), { status: "denied" });
+        await updateDoc(doc(db,"members",docSnap.id), { approved: null }); // or delete the doc if you prefer
       });
     });
   });
