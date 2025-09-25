@@ -149,89 +149,43 @@ async function loadSubmissionPeriods() {
     `;
     container.appendChild(card);
 
-   // See submissions
-  card.querySelector(".seeSubmissions").addEventListener("click", async () => {
-    const submissionsListDiv = card.querySelector(".submissionsList");
-    submissionsListDiv.innerHTML = "";
-    const submissionsSnap = await getDocs(query(collection(db, "books"), where("periodId", "==", docSnap.id)));
-  
-    for (const bookDoc of submissionsSnap.docs) {
-      const b = bookDoc.data();
-  
-      // Fetch user info for submittedBy
-      let memberName = b.submittedBy;
-      try {
-        const userDoc = await getDocs(query(collection(db, "users"), where("uid", "==", b.submittedBy)));
-        if (!userDoc.empty) {
-          memberName = userDoc.docs[0].data().name || b.submittedBy;
-        }
-      } catch (err) {
-        console.error("Error fetching member name:", err);
-      }
-  
-      const subCard = document.createElement("div");
-      subCard.className = "submission-card";
-      subCard.innerHTML = `
-        <img src="${b.coverUrl || 'https://via.placeholder.com/100x150'}" class="book-cover"/>
-        <div class="book-info">
-          <h3>${b.title}</h3>
-          <p>${b.author}</p>
-          <p>By: ${memberName}</p>
-          <div class="edit-section">
-            <button class="btn editBook">Edit</button>
-            <button class="btn deleteBook">Delete</button>
-          </div>
-        </div>
-      `;
-      submissionsListDiv.appendChild(subCard);
-  
-      // Delete book
-      subCard.querySelector(".deleteBook").addEventListener("click", async () => {
-        await deleteDoc(doc(db, "books", bookDoc.id));
-        subCard.remove();
-      });
-  
-      // Edit book (inline placeholder)
-      subCard.querySelector(".editBook").addEventListener("click", async () => {
-        const queryStr = `${b.title} ${b.author}`;
-        const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
-        const data = await res.json();
-        const matches = data.docs.map(d => ({
-          title: d.title,
-          author: d.author_name?.[0] || "",
-          coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/100x150"
-        }));
-        const editDiv = document.createElement("div");
-        editDiv.innerHTML = "<h4>Select a new match:</h4>";
-        matches.forEach((m) => {
-          const mDiv = document.createElement("div");
-          mDiv.className = "submission-card";
-          mDiv.innerHTML = `
-            <img src="${m.coverUrl}" class="book-cover" />
-            <div class="book-info">
-              <h3>${m.title}</h3>
-              <p>${m.author}</p>
-              <button class="btn selectMatch">Select</button>
-            </div>
-          `;
-          editDiv.appendChild(mDiv);
-          mDiv.querySelector(".selectMatch").addEventListener("click", async () => {
-            await updateDoc(doc(db, "books", bookDoc.id), {
-              title: m.title,
-              author: m.author,
-              coverUrl: m.coverUrl
-            });
-            subCard.querySelector(".book-cover").src = m.coverUrl;
-            subCard.querySelector(".book-info h3").innerText = m.title;
-            subCard.querySelector(".book-info p").innerText = m.author;
-            editDiv.remove();
-          });
-        });
-        subCard.appendChild(editDiv);
-      });
-    }
-  });
+    // See submissions
+    card.querySelector(".seeSubmissions").addEventListener("click", async () => {
+      const submissionsListDiv = card.querySelector(".submissionsList");
+      submissionsListDiv.innerHTML = "";
+      const submissionsSnap = await getDocs(query(collection(db, "books"), where("periodId", "==", docSnap.id)));
 
+      for (const bookDoc of submissionsSnap.docs) {
+        const b = bookDoc.data();
+
+        // Fetch member name or email
+        let memberNameOrEmail = b.submittedBy;
+        try {
+          const userQuery = query(collection(db, "users"), where("uid", "==", b.submittedBy));
+          const userSnap = await getDocs(userQuery);
+          if (!userSnap.empty) {
+            const userData = userSnap.docs[0].data();
+            memberNameOrEmail = userData.name || userData.email || b.submittedBy;
+          }
+        } catch (err) {
+          console.error("Error fetching member name/email:", err);
+        }
+
+        const subCard = document.createElement("div");
+        subCard.className = "submission-card";
+        subCard.innerHTML = `
+          <img src="${b.coverUrl || 'https://via.placeholder.com/100x150'}" class="book-cover"/>
+          <div class="book-info">
+            <h3>${b.title}</h3>
+            <p>${b.author}</p>
+            <p>By: ${memberNameOrEmail}</p>
+            <div class="edit-section">
+              <button class="btn editBook">Edit</button>
+              <button class="btn deleteBook">Delete</button>
+            </div>
+          </div>
+        `;
+        submissionsListDiv.appendChild(subCard);
 
         // Delete book
         subCard.querySelector(".deleteBook").addEventListener("click", async () => {
@@ -239,54 +193,72 @@ async function loadSubmissionPeriods() {
           subCard.remove();
         });
 
-        // Edit book (inline placeholder)
-       subCard.querySelector(".editBook").addEventListener("click", async () => {
-        const queryStr = `${b.title} ${b.author}`;
-        const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
-        const data = await res.json();
-        const matches = data.docs.map(d => ({
-          title: d.title,
-          author: d.author_name?.[0] || "",
-          coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/100x150"
-        }));
-        const editDiv = document.createElement("div");
-        editDiv.innerHTML = "<h4>Select a new match:</h4>";
-        matches.forEach((m) => {
-          const mDiv = document.createElement("div");
-          mDiv.className = "submission-card";
-          mDiv.innerHTML = `
-            <img src="${m.coverUrl}" class="book-cover" />
-            <div class="book-info">
-              <h3>${m.title}</h3>
-              <p>${m.author}</p>
-              <button class="btn selectMatch">Select</button>
-            </div>
-          `;
-          editDiv.appendChild(mDiv);
-          mDiv.querySelector(".selectMatch").addEventListener("click", async () => {
-            await updateDoc(doc(db, "books", bookDoc.id), {
-              title: m.title,
-              author: m.author,
-              coverUrl: m.coverUrl
+        // Edit book (inline)
+        subCard.querySelector(".editBook").addEventListener("click", async () => {
+          const queryStr = `${b.title} ${b.author}`;
+          const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
+          const data = await res.json();
+          const matches = data.docs.map(d => ({
+            title: d.title,
+            author: d.author_name?.[0] || "",
+            coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/100x150"
+          }));
+
+          const editDiv = document.createElement("div");
+          editDiv.innerHTML = "<h4>Select a new match:</h4>";
+          matches.forEach((m) => {
+            const mDiv = document.createElement("div");
+            mDiv.className = "submission-card";
+            mDiv.innerHTML = `
+              <img src="${m.coverUrl}" class="book-cover" />
+              <div class="book-info">
+                <h3>${m.title}</h3>
+                <p>${m.author}</p>
+                <button class="btn selectMatch">Select</button>
+              </div>
+            `;
+            editDiv.appendChild(mDiv);
+
+            mDiv.querySelector(".selectMatch").addEventListener("click", async () => {
+              await updateDoc(doc(db, "books", bookDoc.id), {
+                title: m.title,
+                author: m.author,
+                coverUrl: m.coverUrl
+              });
+              subCard.querySelector(".book-cover").src = m.coverUrl;
+              subCard.querySelector(".book-info h3").innerText = m.title;
+              subCard.querySelector(".book-info p").innerText = m.author;
+              editDiv.remove();
             });
-            subCard.querySelector(".book-cover").src = m.coverUrl;
-            subCard.querySelector(".book-info h3").innerText = m.title;
-            subCard.querySelector(".book-info p").innerText = m.author;
-            editDiv.remove();
           });
+          subCard.appendChild(editDiv);
         });
-        subCard.appendChild(editDiv);
-      });
-      });
+      }
     });
 
-    // Edit period name
-    card.querySelector(".editPeriod").addEventListener("click", async () => {
-      const newName = prompt("Enter new period name", period.name);
-      if (newName) {
-        await updateDoc(doc(db, "submissionPeriods", docSnap.id), { name: newName });
+    // Inline edit submission period name
+    card.querySelector(".editPeriod").addEventListener("click", () => {
+      const nameEl = card.querySelector("h3");
+      const currentName = nameEl.innerText.replace(/\(Open\)|\(Closed\)/, "").trim();
+
+      const input = document.createElement("input");
+      input.value = currentName;
+      input.style.padding = "0.3rem";
+      input.style.borderRadius = "6px";
+      input.style.border = "1px solid #ccc";
+      input.style.marginRight = "0.5rem";
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn";
+      saveBtn.innerText = "Save";
+
+      nameEl.replaceWith(input);
+      card.querySelector(".editPeriod").replaceWith(saveBtn);
+
+      saveBtn.addEventListener("click", async () => {
+        await updateDoc(doc(db, "submissionPeriods", docSnap.id), { name: input.value });
         loadSubmissionPeriods();
-      }
+      });
     });
 
     // Delete period
