@@ -24,8 +24,12 @@
 </style>
 </head>
 <body>
-<header>📚 Admin Panel!</header>
+<header>📚 Admin Panel</header>
 <main>
+
+  <!-- Pending Member Requests -->
+  <h2>Pending Member Requests</h2>
+  <div id="memberRequestsList"></div>
 
   <!-- Submission Period Control -->
   <h2>Manage Submission Periods</h2>
@@ -41,7 +45,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, doc, updateDoc, addDoc, deleteDoc, query, where, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, updateDoc, addDoc, deleteDoc, query, where, serverTimestamp, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -59,6 +63,43 @@ const db = getFirestore(app);
 let currentUser = null;
 let submissionOpen = false;
 
+// Real-time Pending Member Requests
+function subscribeToMemberRequests() {
+  const requestsList = document.getElementById("memberRequestsList");
+  const q = query(collection(db, "users"), where("status", "==", "pending"));
+
+  return onSnapshot(q, (snapshot) => {
+    requestsList.innerHTML = ""; // Clear old
+    snapshot.forEach(docSnap => {
+      const user = docSnap.data();
+      const card = document.createElement("div");
+      card.className = "submission-card";
+      card.innerHTML = `
+        <div class="book-info">
+          <h3>${user.name || "Unnamed User"}</h3>
+          <p>${user.email}</p>
+          <div class="edit-section">
+            <button class="btn approveBtn">Approve</button>
+            <button class="btn denyBtn">Deny</button>
+          </div>
+        </div>
+      `;
+      requestsList.appendChild(card);
+
+      // Approve member
+      card.querySelector(".approveBtn").addEventListener("click", async () => {
+        await updateDoc(doc(db,"users",docSnap.id), { status: "approved" });
+      });
+
+      // Deny member
+      card.querySelector(".denyBtn").addEventListener("click", async () => {
+        await updateDoc(doc(db,"users",docSnap.id), { status: "denied" });
+      });
+    });
+  });
+}
+
+// Load submission periods
 async function loadSubmissionPeriods() {
   const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
   const container = document.getElementById("submissionPeriodsList");
@@ -87,7 +128,6 @@ async function loadSubmissionPeriods() {
 
       for (const bookDoc of submissionsSnap.docs) {
         const b = bookDoc.data();
-        // Fetch member name or email
         let memberNameOrEmail = b.submittedBy;
         try {
           const userDocSnap = await getDoc(doc(db, "users", b.submittedBy));
@@ -183,7 +223,6 @@ document.getElementById("toggleSubmission").addEventListener("click", async () =
   const nameInput = document.getElementById("periodName").value.trim();
   const periodsRef = collection(db,"submissionPeriods");
 
-  // Close any active
   const periodsSnap = await getDocs(periodsRef);
   for(const d of periodsSnap.docs){
     if(d.data().active) await updateDoc(doc(db,"submissionPeriods",d.id),{active:false});
@@ -203,10 +242,14 @@ document.getElementById("toggleSubmission").addEventListener("click", async () =
   loadSubmissionPeriods();
 });
 
-// Auth
-onAuthStateChanged(auth,user=>{
-  if(!user) window.location.href="login.html";
-  else { currentUser=user; loadSubmissionPeriods(); }
+// Auth & initialize
+onAuthStateChanged(auth, user => {
+  if(!user) window.location.href = "login.html";
+  else {
+    currentUser = user;
+    subscribeToMemberRequests(); // new real-time member requests section
+    loadSubmissionPeriods();
+  }
 });
 </script>
 </body>
