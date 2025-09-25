@@ -12,23 +12,22 @@
   .btn { background: #4f46e5; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; margin: 0.2rem; }
   .btn:hover { background: #6366f1; }
   input { padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db; margin-right: 0.5rem; margin-bottom: 1rem; }
-  .period-card, .submission-card { background: white; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-  .submission-card { display: flex; gap: 1rem; align-items: center; transition: transform 0.2s ease; }
-  .submission-card:hover { transform: translateY(-2px); }
+  .period-card, .submission-card, .member-card { background: white; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .submission-card, .member-card { display: flex; gap: 1rem; align-items: center; transition: transform 0.2s ease; }
+  .submission-card:hover, .member-card:hover { transform: translateY(-2px); }
   .book-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
   .book-info { flex-grow: 1; }
   .book-info h3 { margin: 0; font-size: 1.2rem; }
   .book-info p { margin: 0.3rem 0; color: #4b5563; }
   .edit-section { margin-top: 0.5rem; }
-  select { padding: 0.4rem; border-radius: 6px; border: 1px solid #d1d5db; margin-right: 0.5rem; }
 </style>
 </head>
 <body>
-<header>📚 Admin Panel!</header>
+<header>📚 Admin Panel</header>
 <main>
 
-  <!-- Pending Member Requests -->
-  <h2>Pending Member Requests</h2>
+  <!-- Member Approvals -->
+  <h2>Approve or Deny Members</h2>
   <div id="memberRequestsList"></div>
 
   <!-- Submission Period Control -->
@@ -45,7 +44,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, doc, updateDoc, addDoc, deleteDoc, query, where, serverTimestamp, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, updateDoc, addDoc, deleteDoc, query, where, serverTimestamp, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -63,38 +62,33 @@ const db = getFirestore(app);
 let currentUser = null;
 let submissionOpen = false;
 
-// Real-time Pending Member Requests (fixed for "members" collection)
-function subscribeToMemberRequests() {
-  const requestsList = document.getElementById("memberRequestsList");
-  const q = query(collection(db, "members"), where("approved", "==", false));
+// Load pending member requests
+async function loadMemberRequests() {
+  const container = document.getElementById("memberRequestsList");
+  container.innerHTML = "";
+  const membersSnap = await getDocs(query(collection(db,"members"), where("approved","==",false)));
+  membersSnap.forEach(docSnap => {
+    const member = docSnap.data();
+    const card = document.createElement("div");
+    card.className = "member-card";
+    card.innerHTML = `
+      <div class="book-info">
+        <h3>${member.name || member.email}</h3>
+        <p>${member.email}</p>
+      </div>
+      <button class="btn approve">Approve</button>
+      <button class="btn deny">Deny</button>
+    `;
+    container.appendChild(card);
 
-  return onSnapshot(q, (snapshot) => {
-    requestsList.innerHTML = ""; // Clear old
-    snapshot.forEach(docSnap => {
-      const member = docSnap.data();
-      const card = document.createElement("div");
-      card.className = "submission-card";
-      card.innerHTML = `
-        <div class="book-info">
-          <h3>${member.name || "Unnamed User"}</h3>
-          <p>${member.email}</p>
-          <div class="edit-section">
-            <button class="btn approveBtn">Approve</button>
-            <button class="btn denyBtn">Deny</button>
-          </div>
-        </div>
-      `;
-      requestsList.appendChild(card);
+    card.querySelector(".approve").addEventListener("click", async () => {
+      await updateDoc(doc(db,"members",docSnap.id), { approved:true });
+      loadMemberRequests();
+    });
 
-      // Approve member
-      card.querySelector(".approveBtn").addEventListener("click", async () => {
-        await updateDoc(doc(db,"members",docSnap.id), { approved: true });
-      });
-
-      // Deny member
-      card.querySelector(".denyBtn").addEventListener("click", async () => {
-        await updateDoc(doc(db,"members",docSnap.id), { approved: null }); // or delete the doc if you prefer
-      });
+    card.querySelector(".deny").addEventListener("click", async () => {
+      await deleteDoc(doc(db,"members",docSnap.id));
+      loadMemberRequests();
     });
   });
 }
@@ -112,99 +106,82 @@ async function loadSubmissionPeriods() {
     const card = document.createElement("div");
     card.className = "period-card";
     card.innerHTML = `
-      <h3>${period.name || 'Unnamed Period'} ${period.active ? '(Open)' : '(Closed)'}</h3>
+      <h3>${period.name || 'Unnamed Period'} ${period.active ? '(Open)' : '(Closed)'} ${period.votingActive ? '(Voting Active)' : ''}</h3>
       <button class="btn seeSubmissions">See Submissions</button>
       <button class="btn editPeriod">Edit Name</button>
       <button class="btn deletePeriod">Delete Period</button>
-      <div class="submissionsList" style="margin-top:1rem;"></div>
     `;
     container.appendChild(card);
 
-    // See submissions
+    // Start/end voting button (only for closed periods)
+    if(!period.active){
+      const voteBtn = document.createElement("button");
+      voteBtn.className = "btn startVoting";
+      voteBtn.innerText = period.votingActive ? "End Voting" : "Start Voting";
+      card.appendChild(voteBtn);
+      voteBtn.addEventListener("click", async () => {
+        await updateDoc(doc(db,"submissionPeriods",docSnap.id), { votingActive: !period.votingActive, voters: [] });
+        loadSubmissionPeriods();
+      });
+    }
+
+    // See submissions + voting results
     card.querySelector(".seeSubmissions").addEventListener("click", async () => {
-      const submissionsListDiv = card.querySelector(".submissionsList");
+      const submissionsListDiv = document.createElement("div");
+      submissionsListDiv.style.marginTop = "1rem";
+      card.appendChild(submissionsListDiv);
       submissionsListDiv.innerHTML = "";
-      const submissionsSnap = await getDocs(query(collection(db, "books"), where("periodId","==",docSnap.id)));
 
-      for (const bookDoc of submissionsSnap.docs) {
-        const b = bookDoc.data();
-        let memberNameOrEmail = b.submittedBy;
-        try {
-          const userDocSnap = await getDoc(doc(db, "users", b.submittedBy));
-          if(userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            memberNameOrEmail = userData.name || userData.email || b.submittedBy;
-          }
-        } catch(e) { console.error(e); }
+      const submissionsSnap = await getDocs(query(collection(db,"books"), where("periodId","==",docSnap.id)));
 
-        const subCard = document.createElement("div");
-        subCard.className = "submission-card";
-        subCard.innerHTML = `
+      // Display books
+      const books = [];
+      for(const bDoc of submissionsSnap.docs){
+        const b = bDoc.data();
+        const bookCard = document.createElement("div");
+        bookCard.className = "submission-card";
+        bookCard.innerHTML = `
           <img src="${b.coverUrl || 'https://via.placeholder.com/120x180'}" class="book-cover"/>
           <div class="book-info">
             <h3>${b.title}</h3>
             <p>${b.author}</p>
-            <p>By: ${memberNameOrEmail}</p>
-            <div class="edit-section">
-              <button class="btn editBook">Edit</button>
-              <button class="btn deleteBook">Delete</button>
-            </div>
+            <p>Votes: ${b.votes?.length || 0}</p>
           </div>
         `;
-        submissionsListDiv.appendChild(subCard);
+        submissionsListDiv.appendChild(bookCard);
+        books.push({...b, id:bDoc.id});
+      }
 
-        // Delete book
-        subCard.querySelector(".deleteBook").addEventListener("click", async () => {
-          await deleteDoc(doc(db,"books",bookDoc.id));
-          subCard.remove();
-        });
+      // Voting results & tie detection
+      if(period.votingActive){
+        const sortedBooks = books.sort((a,b) => (b.votes?.length || 0) - (a.votes?.length || 0));
+        const topVotes = sortedBooks[0]?.votes?.length || 0;
+        const topBooks = sortedBooks.filter(b => (b.votes?.length || 0) === topVotes);
+        if(topBooks.length > 1){
+          const tieNotice = document.createElement("p");
+          tieNotice.innerText = "Tie detected! Start tie-breaker voting for tied books only.";
+          submissionsListDiv.appendChild(tieNotice);
 
-        // Edit book
-        subCard.querySelector(".editBook").addEventListener("click", async () => {
-          const queryStr = `${b.title} ${b.author}`;
-          const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
-          const data = await res.json();
-          const matches = data.docs.map(d => ({
-            title: d.title,
-            author: d.author_name?.[0] || "",
-            coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/120x180"
-          }));
-
-          const editDiv = document.createElement("div");
-          editDiv.innerHTML = "<h4>Select a new match:</h4>";
-          matches.forEach((m) => {
-            const mDiv = document.createElement("div");
-            mDiv.className = "submission-card";
-            mDiv.innerHTML = `
-              <img src="${m.coverUrl}" class="book-cover" />
-              <div class="book-info">
-                <h3>${m.title}</h3>
-                <p>${m.author}</p>
-                <button class="btn selectMatch">Select</button>
-              </div>
-            `;
-            editDiv.appendChild(mDiv);
-            mDiv.querySelector(".selectMatch").addEventListener("click", async () => {
-              await updateDoc(doc(db,"books",bookDoc.id), {
-                title: m.title,
-                author: m.author,
-                coverUrl: m.coverUrl
-              });
-              subCard.querySelector(".book-cover").src = m.coverUrl;
-              subCard.querySelector(".book-info h3").innerText = m.title;
-              subCard.querySelector(".book-info p").innerText = m.author;
-              editDiv.remove();
-            });
+          const tieBtn = document.createElement("button");
+          tieBtn.className = "btn";
+          tieBtn.innerText = "Start Tie-Breaker Voting";
+          tieBtn.addEventListener("click", async () => {
+            // Reset votes for non-tied books
+            for(const b of sortedBooks){
+              if(!topBooks.includes(b)) await updateDoc(doc(db,"books",b.id), { votes: [] });
+            }
+            await updateDoc(doc(db,"submissionPeriods",docSnap.id), { voters: [], votingActive: true });
+            loadSubmissionPeriods();
           });
-          subCard.appendChild(editDiv);
-        });
+          submissionsListDiv.appendChild(tieBtn);
+        }
       }
     });
 
     // Edit period name
     card.querySelector(".editPeriod").addEventListener("click", async () => {
       const newName = prompt("Enter new period name", period.name);
-      if(newName) {
+      if(newName){
         await updateDoc(doc(db,"submissionPeriods",docSnap.id),{name:newName});
         loadSubmissionPeriods();
       }
@@ -223,6 +200,7 @@ document.getElementById("toggleSubmission").addEventListener("click", async () =
   const nameInput = document.getElementById("periodName").value.trim();
   const periodsRef = collection(db,"submissionPeriods");
 
+  // Close any active
   const periodsSnap = await getDocs(periodsRef);
   for(const d of periodsSnap.docs){
     if(d.data().active) await updateDoc(doc(db,"submissionPeriods",d.id),{active:false});
@@ -242,14 +220,10 @@ document.getElementById("toggleSubmission").addEventListener("click", async () =
   loadSubmissionPeriods();
 });
 
-// Auth & initialize
-onAuthStateChanged(auth, user => {
-  if(!user) window.location.href = "login.html";
-  else {
-    currentUser = user;
-    subscribeToMemberRequests(); // new real-time member requests section
-    loadSubmissionPeriods();
-  }
+// Auth
+onAuthStateChanged(auth,user=>{
+  if(!user) window.location.href="login.html";
+  else { currentUser=user; loadMemberRequests(); loadSubmissionPeriods(); }
 });
 </script>
 </body>
