@@ -28,7 +28,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Book Club Dashboard!</h1>
+<h1>📚 Book Club Dashboard</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -86,47 +86,6 @@ async function loadSubmissionStatus() {
   }
 }
 
-// Mobile-friendly cover selection overlay
-function showCoverSelection(matches, onSelect) {
-  const overlay = document.createElement("div");
-  overlay.style.position = "fixed";
-  overlay.style.top = 0;
-  overlay.style.left = 0;
-  overlay.style.width = "100%";
-  overlay.style.height = "100%";
-  overlay.style.background = "rgba(0,0,0,0.8)";
-  overlay.style.display = "flex";
-  overlay.style.flexWrap = "wrap";
-  overlay.style.justifyContent = "center";
-  overlay.style.alignItems = "center";
-  overlay.style.zIndex = 9999;
-  overlay.style.overflowY = "auto";
-  overlay.style.padding = "1rem";
-
-  matches.forEach(m => {
-    const img = document.createElement("img");
-    img.src = m.coverUrl;
-    img.style.width = "120px";
-    img.style.height = "180px";
-    img.style.objectFit = "cover";
-    img.style.border = "3px solid white";
-    img.style.borderRadius = "5px";
-    img.style.margin = "0.5rem";
-    img.style.cursor = "pointer";
-    img.addEventListener("click", () => {
-      onSelect(m);
-      document.body.removeChild(overlay);
-    });
-    overlay.appendChild(img);
-  });
-
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) document.body.removeChild(overlay);
-  });
-
-  document.body.appendChild(overlay);
-}
-
 // Submit book
 document.getElementById("submitBookBtn").addEventListener("click", async () => {
   const title = document.getElementById("bookTitle").value.trim();
@@ -149,30 +108,29 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
   const container = document.getElementById("matchSelection");
   container.innerHTML="<h3>Select the correct match:</h3>";
 
-  matches.forEach(b => {
-    const div = document.createElement("div");
-    div.className = "submission-card";
+  matches.forEach(b=>{
+    const div=document.createElement("div");
+    div.className="submission-card";
     div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><button class="btn btn-primary selectMatch">Select</button></div>`;
     container.appendChild(div);
 
-    div.querySelector(".selectMatch").addEventListener("click", () => {
-      showCoverSelection([b], async (selectedBook) => {
-        try {
-          const docRef = await addDoc(collection(db,"books"),{
-            title:selectedBook.title,
-            author:selectedBook.author,
-            coverUrl:selectedBook.coverUrl,
-            submittedBy:currentUser.uid,
-            periodId:currentPeriodId,
-            createdAt:serverTimestamp()
-          });
-          addSubmissionToList({id: docRef.id, periodId: currentPeriodId, ...selectedBook});
-          container.innerHTML="<p>Book submitted!</p>";
-        } catch(err) {
-          console.error(err);
-          alert("Error submitting book, please try again.");
-        }
-      });
+    div.querySelector(".selectMatch").addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      div.querySelector(".selectMatch").disabled = true;
+      try {
+        const docRef = await addDoc(collection(db,"books"),{
+          title:b.title, author:b.author, coverUrl:b.coverUrl,
+          submittedBy:currentUser.uid, periodId:currentPeriodId,
+          createdAt:serverTimestamp()
+        });
+        // add new submission at the top immediately
+        addSubmissionToList({id: docRef.id, periodId: currentPeriodId, ...b}, document.getElementById("mySubmissionsList"));
+        container.innerHTML="<p>Book submitted!</p>";
+      } catch(err) {
+        console.error(err);
+        div.querySelector(".selectMatch").disabled = false;
+        alert("Error submitting book, please try again.");
+      }
     });
   });
 });
@@ -184,39 +142,43 @@ async function loadMySubmissions() {
   const snap = await getDocs(q);
   const container = document.getElementById("mySubmissionsList");
   container.innerHTML="";
-  const submissions = snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-  submissions.sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0));
-  submissions.forEach(b => addSubmissionToList(b));
+  const submissions = snap.docs
+    .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+    .sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0)); // newest first
+  submissions.forEach(b => addSubmissionToList(b, container));
 }
 
 // Add submission to UI
-function addSubmissionToList(b) {
-  const container = document.getElementById("mySubmissionsList");
+function addSubmissionToList(b, container) {
   const div = document.createElement("div");
   div.className = "submission-card";
 
   const isEditable = b.periodId === currentPeriodId;
   div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><div class="book-actions">${isEditable ? '<button class="btn btn-primary editBook">Edit</button><button class="btn btn-primary changeCover">Change Cover</button><button class="btn btn-danger deleteBook">Delete</button>' : ''}</div></div>`;
-  container.prepend(div);
+
+  container.prepend(div); // newest at top
 
   if(!isEditable) return;
 
+  // Delete
   div.querySelector(".deleteBook").addEventListener("click", async () => {
     if(!confirm("Are you sure?")) return;
     await deleteDoc(doc(db,"books",b.id));
     div.remove();
   });
 
+  // Edit
   div.querySelector(".editBook").addEventListener("click", async () => {
     const newTitle = prompt("Edit title:", b.title);
     const newAuthor = prompt("Edit author:", b.author);
-    if(!newTitle||!newAuthor) return;
+    if(!newTitle || !newAuthor) return;
     await updateDoc(doc(db,"books",b.id), {title:newTitle, author:newAuthor});
     div.querySelector("h3").innerText = newTitle;
     div.querySelector("p").innerText = newAuthor;
     b.title = newTitle; b.author = newAuthor;
   });
 
+  // Change Cover
   div.querySelector(".changeCover").addEventListener("click", async () => {
     const queryStr = `${b.title} ${b.author}`;
     let matches = [];
@@ -226,11 +188,12 @@ function addSubmissionToList(b) {
       matches = data.docs.map(d => ({coverUrl:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:"https://via.placeholder.com/120x180"}));
     } catch(e){ console.error(e);}
     if(matches.length===0) matches.push({coverUrl:"https://via.placeholder.com/120x180"});
-    showCoverSelection(matches, async (selected) => {
-      await updateDoc(doc(db,"books",b.id), {coverUrl:selected.coverUrl});
-      div.querySelector("img.book-cover").src = selected.coverUrl;
-      b.coverUrl = selected.coverUrl;
-    });
+    const newCover = prompt(`Choose a cover number (1-${matches.length}):\n${matches.map((m,i)=>`${i+1}: ${m.coverUrl}`).join("\n")}`);
+    const index = parseInt(newCover)-1;
+    if(!matches[index]) return;
+    await updateDoc(doc(db,"books",b.id), {coverUrl:matches[index].coverUrl});
+    div.querySelector("img.book-cover").src = matches[index].coverUrl;
+    b.coverUrl = matches[index].coverUrl;
   });
 }
 </script>
