@@ -28,7 +28,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Book Club Dashboard</h1>
+<h1>📚 Club Dashboard</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -60,6 +60,8 @@ const db = getFirestore(app);
 
 let currentUser = null;
 let currentPeriodId = null;
+let userVoteCount = 0;
+let currentUserIsAdmin = false;
 
 // Logout
 document.getElementById("logoutBtn").addEventListener("click", async () => {
@@ -71,9 +73,8 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 onAuthStateChanged(auth, async (user) => {
   if (!user) return window.location.href="login.html";
   currentUser = user;
-  const userDoc = await getDocs(query(collection(db,'members'), where('uid','==',currentUser.uid)));
-  currentUser.role = userDoc.docs[0]?.data()?.role || 'member';
-  await setupSubmissionListener();
+  currentUserIsAdmin = (currentUser.uid === "sog7PT2TXTTqqXQFvG2j63blC6f1");
+  await setupSubmissionListener(); // real-time listener
   await loadMySubmissions();
 });
 
@@ -130,7 +131,7 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
           votes: [],
           createdAt:serverTimestamp()
         });
-        loadMySubmissions(); 
+        loadMySubmissions(); // reload submissions to reflect new book
         container.innerHTML="<p>Book submitted!</p>";
       } catch(err) {
         console.error(err);
@@ -141,7 +142,7 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
   });
 });
 
-// Load all my submissions
+// Load all my submissions (chronological, newest first)
 async function loadMySubmissions() {
   if(!currentUser) return;
   const q = query(collection(db,"books"), where("submittedBy","==",currentUser.uid));
@@ -163,35 +164,63 @@ function addSubmissionToList(b, container) {
   const div = document.createElement("div");
   div.className = "submission-card";
 
-  const isSubmitter = b.submittedBy === currentUser.uid;
-  const isAdmin = currentUser.role === 'admin';
-  const isVotingActive = b.votingActive;
-
-  let voteButtonsHTML = '';
-  if(!isSubmitter && !isAdmin && isVotingActive){
-    const hasVoted = b.votes.includes(currentUser.uid);
-    voteButtonsHTML = `<button class="btn btn-primary voteBook" ${hasVoted ? 'disabled' : ''}>Vote</button>`;
-  }
-
-  div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><div class="book-actions">
-    ${isSubmitter && !isVotingActive ? '<button class="btn btn-primary editBook">Edit</button><button class="btn btn-primary changeCover">Change Cover</button><button class="btn btn-danger deleteBook">Delete</button>' : ''}
-    ${voteButtonsHTML}
-    ${isAdmin ? `<p>Votes: ${b.votes.length}</p>` : ''}
-  </div></div>`;
+  const isEditable = b.periodId === currentPeriodId && !b.votingActive;
+  div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><div class="book-actions">${isEditable ? '<button class="btn btn-primary editBook">Edit</button><button class="btn btn-primary changeCover">Change Cover</button><button class="btn btn-danger deleteBook">Delete</button>' : ''}</div></div>`;
 
   container.appendChild(div);
 
-  // Voting click
-  div.querySelector(".voteBook")?.addEventListener("click", async () => {
-    if(b.votes.includes(currentUser.uid)) return;
-    if(b.votes.length >= 3) return; // ensure max 3 votes per user globally if you track it elsewhere
-    const bookRef = doc(db,"books",b.id);
-    await updateDoc(bookRef,{ votes: [...b.votes,currentUser.uid] });
-    loadMySubmissions();
-  });
-
-  // Admin actions or submitter actions can be wired similarly
+  if(isEditable) {
+    div.querySelector(".editBook").addEventListener("click", async () => { /* edit logic */ });
+    div.querySelector(".changeCover").addEventListener("click", async () => { /* change cover logic */ });
+    div.querySelector(".deleteBook").addEventListener("click", async () => {
+      if(confirm("Delete this book?")) await deleteDoc(doc(db,"books",b.id));
+      loadMySubmissions();
+    });
+  }
 }
+
+// Voting logic (members can vote for up to 3 books, each book only once)
+async function loadVotingOptions() {
+  const snap = await getDocs(collection(db,"books"));
+  const container = document.getElementById("matchSelection");
+  container.innerHTML = "<h3>Vote for Books</h3>";
+  const allBooks = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+  // count user's votes
+  userVoteCount = allBooks.filter(b => b.votes?.includes(currentUser.uid)).length;
+
+  allBooks.forEach(b=>{
+    const div = document.createElement("div");
+    div.className = "submission-card";
+    div.innerHTML = `
+      <img src="${b.coverUrl}" class="book-cover"/>
+      <div class="book-info">
+        <h3>${b.title}</h3>
+        <p>${b.author}</p>
+        ${currentUserIsAdmin ? `<p>Votes: ${b.votes?.length || 0}</p>` : ''}
+        <button class="btn btn-primary voteBook">Vote</button>
+      </div>
+    `;
+    container.appendChild(div);
+
+    div.querySelector(".voteBook").addEventListener("click", async () => {
+      if(b.votes?.includes(currentUser.uid)) return alert("You already voted for this book");
+      if(userVoteCount >= 3) return alert("You can only vote for 3 books");
+
+      await updateDoc(doc(db,"books",b.id), { votes:[...(b.votes||[]), currentUser.uid] });
+      loadVotingOptions();
+    });
+  });
+}
+
+// Initialize voting options if period is active and voting started
+async function initVoting() {
+  if(!currentPeriodId) return;
+  const periodDoc = await getDocs(collection(db,"submissionPeriods"));
+  const activePeriod = periodDoc.docs.find(d => d.id===currentPeriodId)?.data();
+  if(activePeriod?.votingActive) loadVotingOptions();
+}
+initVoting();
 
 </script>
 </body>
