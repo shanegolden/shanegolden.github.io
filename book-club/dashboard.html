@@ -24,7 +24,7 @@
 </style>
 </head>
 <body>
-<header>📚 Book Club Dashboard!</header>
+<header>📚 Book Club Dashboard</header>
 <main>
 
   <!-- Dynamic Top Section: Submission Form or Voting -->
@@ -61,7 +61,7 @@ async function loadTopSection() {
   const topSection = document.getElementById("topSection");
   topSection.innerHTML = "";
 
-  // Fetch current active period
+  // Fetch current active submission period
   const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
   let activePeriod = null;
   periodsSnap.forEach(d => {
@@ -69,7 +69,7 @@ async function loadTopSection() {
     if(data.active) activePeriod = { id: d.id, ...data };
   });
 
-  // Check if voting is active
+  // Check if voting is active for this period
   const votingSnap = await getDocs(collection(db, "voting"));
   let activeVoting = null;
   votingSnap.forEach(d => {
@@ -77,8 +77,8 @@ async function loadTopSection() {
     if(data.periodId === activePeriod?.id && data.active) activeVoting = { id: d.id, ...data };
   });
 
+  // Show submission form if period is active and voting is NOT active
   if(activePeriod && !activeVoting) {
-    // Show submission form
     const formDiv = document.createElement("div");
     formDiv.className = "card";
     formDiv.innerHTML = `
@@ -109,8 +109,8 @@ async function loadTopSection() {
       loadSubmissionHistory();
     });
 
+  // Show voting section if period is active and voting IS active
   } else if(activePeriod && activeVoting) {
-    // Show voting interface
     const voteDiv = document.createElement("div");
     voteDiv.className = "card";
     voteDiv.innerHTML = `<h2>Vote for Your Favorite Books</h2><div id="voteBooks" class="vote-section"></div><button id="submitVote" class="btn">Submit Vote</button><div id="voteMessage"></div>`;
@@ -143,7 +143,7 @@ async function loadTopSection() {
         });
       }
       document.getElementById("voteMessage").innerText="Vote submitted!";
-      loadTopSection(); // reload to prevent double voting (optional: hide checkboxes)
+      loadTopSection(); // refresh top section to prevent double voting
     });
   }
 }
