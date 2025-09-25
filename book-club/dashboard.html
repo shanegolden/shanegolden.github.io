@@ -31,7 +31,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Club Dashboard</h1>
+<h1>📚 Club Dashboard!</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -249,15 +249,56 @@ async function loadMySubmissions() {
 // Display winner only if any votes exist
 async function displayWinner() {
   const container = document.getElementById("winnerDisplay");
-  const booksSnap = await getDocs(query(collection(db,"books"), where("periodId","==",currentPeriod.id)));
-  const books = booksSnap.docs.map(d=>({id:d.id, ...d.data()}));
-  if(books.length===0 || books.every(b=>!b.votes?.length)) {
+  container.innerHTML = ""; // clear previous content
+
+  if (!currentPeriod) return;
+
+  const booksSnap = await getDocs(query(collection(db, "books"), where("periodId", "==", currentPeriod.id)));
+  const books = booksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  if (books.length === 0 || books.every(b => !b.votes?.length)) {
     container.innerText = "No winner yet";
     return;
   }
-  const winner = books.sort((a,b)=>(b.votes?.length||0)-(a.votes?.length||0))[0];
-  container.innerText = `Winner: ${winner.title} by ${winner.author} with ${winner.votes?.length||0} votes`;
+
+  // Get the winner (most votes)
+  const winner = books.sort((a, b) => (b.votes?.length || 0) - (a.votes?.length || 0))[0];
+
+  // Fetch additional info from Open Library
+  let details = {};
+  try {
+    const res = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(winner.title)}&author=${encodeURIComponent(winner.author)}&limit=1`);
+    const data = await res.json();
+    if (data.docs && data.docs.length > 0) {
+      const doc = data.docs[0];
+      details.year = doc.first_publish_year || "Unknown";
+      details.pages = doc.number_of_pages_median || "Unknown";
+      details.description = doc.subtitle || doc.text?.slice(0, 200)?.join(" ") || "No description available";
+    }
+  } catch (err) {
+    console.error(err);
+    details = { year: "Unknown", pages: "Unknown", description: "No description available" };
+  }
+
+  // Display winner as a card
+  const div = document.createElement("div");
+  div.className = "submission-card";
+  div.style.flexDirection = "column";
+  div.style.alignItems = "center";
+  div.innerHTML = `
+    <img src="${winner.coverUrl}" class="book-cover" style="width:150px;height:220px"/>
+    <div class="book-info" style="text-align:center; margin-top:0.5rem;">
+      <h3>${winner.title}</h3>
+      <p><strong>Author:</strong> ${winner.author}</p>
+      <p><strong>Year Published:</strong> ${details.year}</p>
+      <p><strong>Pages:</strong> ${details.pages}</p>
+      <p style="font-size:0.9rem;"><strong>Description:</strong> ${details.description}</p>
+      <p style="margin-top:0.5rem;"><strong>Votes:</strong> ${winner.votes?.length || 0}</p>
+    </div>
+  `;
+  container.appendChild(div);
 }
+
 </script>
 </body>
 </html>
