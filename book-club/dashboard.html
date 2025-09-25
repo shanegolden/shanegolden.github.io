@@ -5,52 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Book Club Dashboard</title>
 <style>
-  body { font-family: Arial, sans-serif; background: #f2f2f2; margin:0; padding:0; }
-  header { background:#4A90E2; color:white; padding:20px; text-align:center; }
-  main { max-width: 900px; margin: 20px auto; background:white; padding:20px; border-radius:10px; }
-  h1,h2 { margin-top:0; }
-  #submissionForm input { padding:10px; margin:5px; width: calc(100% - 24px); box-sizing:border-box; }
-  #submissionForm button { padding:10px 20px; margin:10px 0; background:#4A90E2; color:white; border:none; border-radius:5px; cursor:pointer; }
-  #submissionForm button:disabled { background:grey; cursor:default; }
-  .book-card { display:flex; align-items:center; margin:15px 0; background:#f9f9f9; padding:10px; border-radius:8px; }
-  .book-card img { width:120px; height:auto; margin-right:20px; border-radius:5px; }
-  .book-card .info { flex:1; }
-  .book-card .actions button { margin-right:10px; padding:5px 10px; border:none; border-radius:5px; cursor:pointer; }
-  .book-card .actions button.edit { background:#F5A623; color:white; }
-  .book-card .actions button.save { background:#7ED321; color:white; }
-  .book-card .actions button.cancel { background:#d9534f; color:white; }
-  .alternatives { margin-top:10px; }
-  .alternatives div { display:flex; align-items:center; margin-bottom:10px; cursor:pointer; border:1px solid #ccc; padding:5px; border-radius:5px; background:white; }
-  .alternatives img { width:80px; height:auto; margin-right:15px; border-radius:5px; }
-  .alternatives.selected { border:2px solid #4A90E2; }
-  #logoutBtn { position:fixed; top:20px; right:20px; padding:10px 20px; background:#d9534f; color:white; border:none; border-radius:5px; cursor:pointer; }
+body { font-family: Arial, sans-serif; background:#f2f2f2; margin:0; padding:0; }
+header { background:#4A90E2; color:white; padding:20px; text-align:center; position:relative; }
+header button { position:absolute; right:20px; top:20px; padding:10px 20px; background:#d9534f; color:white; border:none; border-radius:5px; cursor:pointer; }
+main { max-width: 900px; margin:20px auto; background:white; padding:20px; border-radius:10px; }
+h1,h2,h3 { margin-top:0; }
+input, select { padding:8px; margin:5px 0; width:100%; max-width:400px; }
+button { padding:8px 15px; margin:5px; border:none; border-radius:5px; cursor:pointer; }
+button.primary { background:#4A90E2; color:white; }
+button.secondary { background:#7ED321; color:white; }
+button.disabled { background:grey; cursor:default; }
+.book-card { display:flex; align-items:center; background:#f9f9f9; padding:10px; margin:10px 0; border-radius:8px; flex-wrap:wrap; }
+.book-card img { width:120px; margin-right:15px; border-radius:5px; }
+.book-card .info { flex:1; min-width:200px; }
+.alternatives { margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; }
+.alternatives div { cursor:pointer; padding:5px; border:1px solid #ccc; border-radius:5px; display:flex; align-items:center; background:white; }
+.alternatives img { width:80px; margin-right:10px; border-radius:5px; }
+#bookMessage { margin-top:10px; font-weight:bold; color:#4A90E2; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>📚 My Book Club Dashboard</h1>
+  <h1>📚 My Dashboard</h1>
   <button id="logoutBtn">Logout</button>
 </header>
 
 <main>
-  <h2>Submit Your Book</h2>
-  <div id="submissionForm">
+  <div id="submissionStatus"></div>
+
+  <div id="submitBookSection" style="display:none;">
+    <h2>Submit a Book</h2>
     <input type="text" id="bookTitle" placeholder="Book Title">
     <input type="text" id="bookAuthor" placeholder="Author Name">
     <input type="text" id="bookISBN" placeholder="ISBN (optional)">
-    <button id="submitBookBtn">Submit Book</button>
-    <div id="submissionMessage"></div>
+    <button id="checkMatchBtn" class="primary">Check Match</button>
+    <div id="matchOptions" class="alternatives"></div>
+    <div id="bookMessage"></div>
   </div>
 
-  <h2>Your Submitted Books</h2>
-  <div id="submittedBooks"></div>
+  <h2>My Submitted Books</h2>
+  <div id="myBooksContainer"></div>
 </main>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, doc, addDoc, getDocs, updateDoc, query, where, serverTimestamp, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, orderBy, getDocs, addDoc, updateDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -67,116 +68,105 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let currentUser = null;
-let currentSubmissionPeriod = null;
+let activePeriod = null;
 
-// Logout
-document.getElementById("logoutBtn").addEventListener("click", async () => {
+document.getElementById("logoutBtn").addEventListener("click", async ()=>{
   await signOut(auth);
-  window.location.href = "login.html";
+  window.location.href="login.html";
 });
 
-// Fuzzy matching helpers
-function normalize(str){ return str.toLowerCase().replace(/[^a-z0-9]/g,'').trim(); }
-function levenshtein(a,b){ const matrix=Array.from({length:a.length+1},()=>Array(b.length+1).fill(0)); for(let i=0;i<=a.length;i++)matrix[i][0]=i;for(let j=0;j<=b.length;j++)matrix[0][j]=j;for(let i=1;i<=a.length;i++){for(let j=1;j<=b.length;j++){const cost=a[i-1]===b[j-1]?0:1;matrix[i][j]=Math.min(matrix[i-1][j]+1,matrix[i][j-1]+1,matrix[i-1][j-1]+cost);}}return matrix[a.length][b.length]; }
-function similarity(a,b){ a=normalize(a); b=normalize(b); let longer=a.length>b.length?a:b; let shorter=a.length>b.length?b:a; if(!longer.length)return 1.0; return (longer.length-levenshtein(longer,shorter))/longer.length; }
-
-async function fetchMatchedBook(title,author,isbn){
-  let alternatives=[];
-  // Try ISBN
-  if(isbn){
-    try{
-      const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
-      const data = await res.json();
-      const key = `ISBN:${isbn}`;
-      if(data[key]){
-        alternatives.push({title:data[key].title||title,author:data[key].authors?.[0]?.name||author,coverUrl:data[key].cover?.medium||""});
-      }
-    }catch(e){console.error(e);}
-  }
-  // Search Open Library
-  try{
-    const res=await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=10`);
-    const data=await res.json();
-    if(data.docs.length>0){
-      const scored=data.docs.map(doc=>{
-        return {title:doc.title,author:doc.author_name?.[0]||"",coverUrl:doc.cover_i?`https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`:"",score:(similarity(title,doc.title)+similarity(author,doc.author_name?.[0]||""))/2};
-      });
-      scored.sort((a,b)=>b.score-a.score);
-      scored.forEach(s=>alternatives.push({title:s.title,author:s.author,coverUrl:s.coverUrl}));
-    }
-  }catch(e){console.error(e);}
-  return { title: alternatives[0]?.title||title, author: alternatives[0]?.author||author, coverUrl: alternatives[0]?.coverUrl||"", alternatives };
-}
-
-// Track auth state
-onAuthStateChanged(auth, async user=>{
-  if(!user){ window.location.href="login.html"; return; }
+onAuthStateChanged(auth, user=>{
+  if(!user) window.location.href="login.html";
   currentUser=user;
-  initSubmissionPeriodListener();
+  listenActivePeriod();
+  loadMyBooks();
 });
 
-// Listen for current open submission period
-async function initSubmissionPeriodListener(){
-  const periodsSnap = collection(db,"submissionsPeriods");
-  onSnapshot(periodsSnap, snapshot=>{
+// ------------------ Real-time Submission Period ----------------
+function listenActivePeriod(){
+  onSnapshot(collection(db,"submissionsPeriods"), snapshot=>{
+    activePeriod = null;
     snapshot.forEach(docSnap=>{
-      const data = docSnap.data();
-      if(data.active) currentSubmissionPeriod={id:docSnap.id,...data};
+      if(docSnap.data().active) activePeriod={id:docSnap.id,...docSnap.data()};
     });
-    renderSubmissionForm();
-    loadUserBooks();
+    updateSubmissionUI();
   });
 }
 
-// Render submission form based on current period
-function renderSubmissionForm(){
-  const submitBtn=document.getElementById("submitBookBtn");
-  const messageDiv=document.getElementById("submissionMessage");
-  if(!currentSubmissionPeriod){
-    submitBtn.disabled=true;
-    messageDiv.innerText="Submissions are currently closed.";
+function updateSubmissionUI(){
+  const status=document.getElementById("submissionStatus");
+  const section=document.getElementById("submitBookSection");
+  if(activePeriod){
+    status.innerText="Book submissions are OPEN!";
+    section.style.display="block";
   }else{
-    submitBtn.disabled=false;
-    messageDiv.innerText="";
+    status.innerText="Book submissions are CLOSED.";
+    section.style.display="none";
   }
 }
 
-// Submit book
-document.getElementById("submitBookBtn").addEventListener("click", async ()=>{
+// ------------------ Book Matching ----------------
+async function fetchBookMatches(title, author, isbn){
+  let matches=[];
+  try{
+    if(isbn){
+      const res=await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+      const data=await res.json();
+      const key=`ISBN:${isbn}`;
+      if(data[key]) matches.push({title:data[key].title||title, author:data[key].authors?.[0]?.name||author, coverUrl:data[key].cover?.medium||""});
+    }
+    const res2=await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=5`);
+    const data2=await res2.json();
+    if(data2.docs.length>0){
+      data2.docs.forEach(d=>{
+        matches.push({title:d.title,author:d.author_name?.[0]||"",coverUrl:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:""});
+      });
+    }
+  }catch(e){console.error(e);}
+  return matches;
+}
+
+document.getElementById("checkMatchBtn").addEventListener("click", async ()=>{
+  if(!activePeriod) return;
   const title=document.getElementById("bookTitle").value.trim();
   const author=document.getElementById("bookAuthor").value.trim();
   const isbn=document.getElementById("bookISBN").value.trim();
+  if(!title||!author){ document.getElementById("bookMessage").innerText="Title and author required"; return; }
 
-  if(!title||!author){ document.getElementById("submissionMessage").innerText="Title and author are required."; return; }
-  if(!currentSubmissionPeriod){ document.getElementById("submissionMessage").innerText="No active submission period."; return; }
+  const q=query(collection(db,"books"),where("submittedBy","==",currentUser.uid),where("submissionPeriodId","==",activePeriod.id));
+  const snap=await getDocs(q);
+  if(!snap.empty){ document.getElementById("bookMessage").innerText="You already submitted a book for this period"; return; }
 
-  // Check if user already submitted in this period
-  const q=query(collection(db,"books"),where("submittedBy","==",currentUser.uid),where("submissionPeriodId","==",currentSubmissionPeriod.id));
-  const existing=await getDocs(q);
-  if(!existing.empty){ document.getElementById("submissionMessage").innerText="You already submitted a book for this period."; return; }
-
-  const matched=await fetchMatchedBook(title,author,isbn);
-  try{
-    await addDoc(collection(db,"books"),{
-      title:matched.title,
-      author:matched.author,
-      coverUrl:matched.coverUrl,
-      submittedBy:currentUser.uid,
-      submissionPeriodId:currentSubmissionPeriod.id,
-      createdAt:serverTimestamp(),
-      alternatives:matched.alternatives
+  const matches=await fetchBookMatches(title,author,isbn);
+  const container=document.getElementById("matchOptions");
+  container.innerHTML="";
+  matches.forEach(match=>{
+    const div=document.createElement("div");
+    div.innerHTML=`<img src="${match.coverUrl||''}"><span>${match.title} by ${match.author}</span>`;
+    div.addEventListener("click", async ()=>{
+      await addDoc(collection(db,"books"),{
+        title:match.title,
+        author:match.author,
+        coverUrl:match.coverUrl,
+        submittedBy:currentUser.uid,
+        submissionPeriodId:activePeriod.id,
+        createdAt:serverTimestamp(),
+        alternatives:matches
+      });
+      document.getElementById("bookMessage").innerText="Book submitted!";
+      container.innerHTML="";
+      document.getElementById("bookTitle").value="";
+      document.getElementById("bookAuthor").value="";
+      document.getElementById("bookISBN").value="";
+      loadMyBooks();
     });
-    document.getElementById("submissionMessage").innerText=`Book "${matched.title}" submitted successfully!`;
-    document.getElementById("bookTitle").value="";
-    document.getElementById("bookAuthor").value="";
-    document.getElementById("bookISBN").value="";
-    loadUserBooks();
-  }catch(e){console.error(e);}
+    container.appendChild(div);
+  });
 });
 
-// Load user's books
-async function loadUserBooks(){
-  const container=document.getElementById("submittedBooks");
+// ------------------ Load My Books ----------------
+async function loadMyBooks(){
+  const container=document.getElementById("myBooksContainer");
   container.innerHTML="";
   const q=query(collection(db,"books"),where("submittedBy","==",currentUser.uid),orderBy("createdAt","desc"));
   const snap=await getDocs(q);
@@ -184,27 +174,26 @@ async function loadUserBooks(){
     const data=docSnap.data();
     const card=document.createElement("div");
     card.className="book-card";
-    card.innerHTML=`<img src="${data.coverUrl||''}" alt="cover"><div class="info"><strong>${data.title}</strong><br>by ${data.author}</div><div class="actions"><button class="edit">Edit</button></div></div>`;
+    card.innerHTML=`<img src="${data.coverUrl||''}"><div class="info"><strong>${data.title}</strong><br>by ${data.author}</div>`;
+    if(activePeriod && data.submissionPeriodId===activePeriod.id){
+      const editBtn=document.createElement("button"); editBtn.innerText="Edit"; editBtn.className="secondary";
+      editBtn.addEventListener("click",()=>showEditOptions(card,docSnap.id,data));
+      card.appendChild(editBtn);
+    }
     container.appendChild(card);
-
-    const editBtn=card.querySelector(".edit");
-    editBtn.addEventListener("click", ()=>{
-      showEditOptions(card,docSnap.id,data);
-    });
   });
 }
 
-// Show inline edit options
+// ------------------ Inline Edit ----------------
 function showEditOptions(card,bookId,data){
-  card.innerHTML=`<img src="${data.coverUrl||''}" alt="cover"><div class="info"><strong>${data.title}</strong><br>by ${data.author}</div>`;
+  card.innerHTML=`<img src="${data.coverUrl||''}"><div class="info"><strong>${data.title}</strong><br>by ${data.author}</div>`;
   const altDiv=document.createElement("div"); altDiv.className="alternatives"; card.appendChild(altDiv);
-
-  data.alternatives.forEach((alt,i)=>{
+  data.alternatives.forEach(alt=>{
     const option=document.createElement("div");
     option.innerHTML=`<img src="${alt.coverUrl||''}"><span>${alt.title} by ${alt.author}</span>`;
     option.addEventListener("click", async ()=>{
       await updateDoc(doc(db,"books",bookId),{title:alt.title,author:alt.author,coverUrl:alt.coverUrl});
-      loadUserBooks();
+      loadMyBooks();
     });
     altDiv.appendChild(option);
   });
