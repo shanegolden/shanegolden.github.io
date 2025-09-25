@@ -7,27 +7,30 @@
 <style>
   body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f8; margin: 0; padding: 0; }
   header { background: linear-gradient(90deg, #4f46e5, #6366f1); color: white; padding: 2rem; text-align: center; font-size: 1.8rem; font-weight: bold; }
-  main { padding: 2rem; max-width: 800px; margin: auto; }
+  main { padding: 2rem; max-width: 1000px; margin: auto; }
   h2 { color: #1f2937; margin-top: 2rem; }
   .btn { background: #4f46e5; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; margin: 0.2rem; }
   .btn:hover { background: #6366f1; }
   input { padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db; margin-right: 0.5rem; margin-bottom: 1rem; }
-  .submission-card { display: flex; gap: 1rem; margin-bottom: 1rem; cursor: pointer; border-radius: 12px; padding: 1rem; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .card { background: white; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .submission-card { display: flex; gap: 1rem; align-items: center; transition: transform 0.2s ease; }
+  .submission-card:hover { transform: translateY(-2px); }
   .book-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
   .book-info { flex-grow: 1; }
   .book-info h3 { margin: 0; font-size: 1.2rem; }
   .book-info p { margin: 0.3rem 0; color: #4b5563; }
-  .selected { outline: 3px solid #fbbf24; }
+  .vote-section { display: flex; flex-direction: column; gap: 0.5rem; }
+  .vote-book { display: flex; align-items: center; gap: 1rem; }
 </style>
 </head>
 <body>
-<header>📚 Book Club Dashboard</header>
+<header>📚 Book Club Dashboard!</header>
 <main>
 
-  <!-- Dynamic Top Section: Submission, Voting, or Winner -->
+  <!-- Dynamic Top Section: Submission Form or Voting -->
   <div id="topSection"></div>
 
-  <!-- User Submission History -->
+  <!-- Submission History -->
   <h2>Your Submission History</h2>
   <div id="submissionHistory"></div>
 
@@ -36,7 +39,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, query, where, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, addDoc, updateDoc, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -50,135 +53,119 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
 let currentUser = null;
 
-// ========================== Load Top Section ==========================
+// Load top section (submission form or voting)
 async function loadTopSection() {
-  const topDiv = document.getElementById("topSection");
-  topDiv.innerHTML = "";
+  const topSection = document.getElementById("topSection");
+  topSection.innerHTML = "";
 
-  const periodsSnap = await getDocs(collection(db,"submissionPeriods"));
-  const activePeriod = periodsSnap.docs.find(d => d.data().active || d.data().votingActive || d.data().winnerId);
+  // Fetch current active period
+  const periodsSnap = await getDocs(collection(db, "submissionPeriods"));
+  let activePeriod = null;
+  periodsSnap.forEach(d => {
+    const data = d.data();
+    if(data.active) activePeriod = { id: d.id, ...data };
+  });
 
-  if(!activePeriod){
-    topDiv.innerHTML = "<p>No submissions or voting right now.</p>";
-    return;
-  }
+  // Check if voting is active
+  const votingSnap = await getDocs(collection(db, "voting"));
+  let activeVoting = null;
+  votingSnap.forEach(d => {
+    const data = d.data();
+    if(data.periodId === activePeriod?.id && data.active) activeVoting = { id: d.id, ...data };
+  });
 
-  const period = activePeriod.data();
-  period.id = activePeriod.id;
-
-  if(period.active){
-    // Submissions Form
-    topDiv.innerHTML = `
-      <h2>Submit Your Book for ${period.name}</h2>
-      <input id="bookTitle" placeholder="Book Title"/>
-      <input id="bookAuthor" placeholder="Author"/>
-      <button id="submitBookBtn" class="btn">Submit Book</button>
+  if(activePeriod && !activeVoting) {
+    // Show submission form
+    const formDiv = document.createElement("div");
+    formDiv.className = "card";
+    formDiv.innerHTML = `
+      <h2>Submit a Book</h2>
+      <input id="bookTitle" placeholder="Book Title" />
+      <input id="bookAuthor" placeholder="Book Author" />
+      <button id="submitBook" class="btn">Submit</button>
+      <div id="submissionMessage"></div>
     `;
-    document.getElementById("submitBookBtn").addEventListener("click", async () => {
+    topSection.appendChild(formDiv);
+
+    document.getElementById("submitBook").addEventListener("click", async () => {
       const title = document.getElementById("bookTitle").value.trim();
       const author = document.getElementById("bookAuthor").value.trim();
-      if(!title || !author){ alert("Enter title and author"); return; }
-      await addDoc(collection(db,"books"), {
-        title, author, submittedBy: currentUser.uid, periodId: period.id, createdAt: serverTimestamp()
+      if(!title || !author) { document.getElementById("submissionMessage").innerText="Enter title and author."; return; }
+
+      await addDoc(collection(db, "books"), {
+        title,
+        author,
+        submittedBy: currentUser.uid,
+        periodId: activePeriod.id,
+        createdAt: serverTimestamp()
       });
-      alert("Book submitted!");
-      document.getElementById("bookTitle").value = "";
-      document.getElementById("bookAuthor").value = "";
+
+      document.getElementById("bookTitle").value="";
+      document.getElementById("bookAuthor").value="";
+      document.getElementById("submissionMessage").innerText="Book submitted!";
       loadSubmissionHistory();
     });
-  } else if(period.votingActive){
-    // Voting Section
-    topDiv.innerHTML = `<h2>Vote for Books in ${period.name}</h2>`;
-    const booksSnap = await getDocs(query(collection(db,"books"), where("periodId","==",period.id)));
-    const selectedVotes = new Set();
 
-    booksSnap.forEach(bDoc => {
-      const b = bDoc.data();
-      const bookCard = document.createElement("div");
-      bookCard.className = "submission-card";
-      bookCard.innerHTML = `
-        <img src="${b.coverUrl || 'https://via.placeholder.com/120x180'}" class="book-cover"/>
-        <div class="book-info">
-          <h3>${b.title}</h3>
-          <p>${b.author}</p>
-        </div>
+  } else if(activePeriod && activeVoting) {
+    // Show voting interface
+    const voteDiv = document.createElement("div");
+    voteDiv.className = "card";
+    voteDiv.innerHTML = `<h2>Vote for Your Favorite Books</h2><div id="voteBooks" class="vote-section"></div><button id="submitVote" class="btn">Submit Vote</button><div id="voteMessage"></div>`;
+    topSection.appendChild(voteDiv);
+
+    const voteContainer = document.getElementById("voteBooks");
+    const booksSnap = await getDocs(query(collection(db, "books"), where("periodId","==",activePeriod.id)));
+    booksSnap.forEach(d => {
+      const book = d.data();
+      const bookDiv = document.createElement("div");
+      bookDiv.className = "vote-book";
+      bookDiv.innerHTML = `
+        <input type="checkbox" class="voteCheckbox" data-bookid="${d.id}" />
+        <p>${book.title} by ${book.author}</p>
       `;
-      topDiv.appendChild(bookCard);
-
-      bookCard.addEventListener("click", () => {
-        if(selectedVotes.has(bDoc.id)){
-          selectedVotes.delete(bDoc.id);
-          bookCard.classList.remove("selected");
-        } else if(selectedVotes.size < 3){
-          selectedVotes.add(bDoc.id);
-          bookCard.classList.add("selected");
-        } else {
-          alert("You can only vote for up to 3 books");
-        }
-      });
+      voteContainer.appendChild(bookDiv);
     });
 
-    const submitBtn = document.createElement("button");
-    submitBtn.className = "btn";
-    submitBtn.innerText = "Submit Votes";
-    topDiv.appendChild(submitBtn);
+    document.getElementById("submitVote").addEventListener("click", async () => {
+      const checked = Array.from(document.querySelectorAll(".voteCheckbox:checked"));
+      if(checked.length === 0 || checked.length > 3) { document.getElementById("voteMessage").innerText="Select 1-3 books."; return; }
 
-    submitBtn.addEventListener("click", async () => {
-      if(selectedVotes.size === 0){ alert("Select at least one book"); return; }
-      for(const bDoc of booksSnap.docs){
-        const votesRef = bDoc.ref;
-        if(selectedVotes.has(bDoc.id)){
-          await updateDoc(votesRef, { votes: Array.from(new Set([...(bDoc.data().votes || []), currentUser.uid])) });
-        } else {
-          await updateDoc(votesRef, { votes: (bDoc.data().votes || []).filter(uid => uid !== currentUser.uid) });
-        }
+      const votesRef = collection(db, "votes");
+      for(const c of checked){
+        await addDoc(votesRef, {
+          bookId: c.dataset.bookid,
+          userId: currentUser.uid,
+          periodId: activePeriod.id,
+          createdAt: serverTimestamp()
+        });
       }
-      alert("Votes submitted!");
-      loadTopSection(); // refresh to possibly show winner if voting is done
+      document.getElementById("voteMessage").innerText="Vote submitted!";
+      loadTopSection(); // reload to prevent double voting (optional: hide checkboxes)
     });
-  } else if(period.winnerId){
-    // Winner Display
-    const winnerDoc = await db.collection("books").doc(period.winnerId).get(); // pseudo-code
-    const winnerData = winnerDoc.data();
-    topDiv.innerHTML = `
-      <h2>Winner of ${period.name}</h2>
-      <div class="submission-card">
-        <img src="${winnerData.coverUrl || 'https://via.placeholder.com/120x180'}" class="book-cover"/>
-        <div class="book-info">
-          <h3>${winnerData.title}</h3>
-          <p>${winnerData.author}</p>
-        </div>
-      </div>
-    `;
   }
 }
 
-// ========================== Load Submission History ==========================
+// Load user submission history
 async function loadSubmissionHistory() {
   const historyDiv = document.getElementById("submissionHistory");
   historyDiv.innerHTML = "";
-  const booksSnap = await getDocs(query(collection(db,"books"), where("submittedBy","==",currentUser.uid)));
-  booksSnap.forEach(bDoc => {
-    const b = bDoc.data();
-    const bookCard = document.createElement("div");
-    bookCard.className = "submission-card";
-    bookCard.innerHTML = `
-      <img src="${b.coverUrl || 'https://via.placeholder.com/120x180'}" class="book-cover"/>
-      <div class="book-info">
-        <h3>${b.title}</h3>
-        <p>${b.author}</p>
-      </div>
-    `;
-    historyDiv.appendChild(bookCard);
+  const booksSnap = await getDocs(query(collection(db, "books"), where("submittedBy","==",currentUser.uid)));
+  booksSnap.forEach(d => {
+    const book = d.data();
+    const card = document.createElement("div");
+    card.className = "submission-card";
+    card.innerHTML = `<div class="book-info"><h3>${book.title}</h3><p>${book.author}</p></div>`;
+    historyDiv.appendChild(card);
   });
 }
 
-// ========================== Auth ==========================
-onAuthStateChanged(auth,user=>{
+// Auth
+onAuthStateChanged(auth, user => {
   if(!user) window.location.href="login.html";
-  else { currentUser=user; loadTopSection(); loadSubmissionHistory(); }
+  else { currentUser = user; loadTopSection(); loadSubmissionHistory(); }
 });
 </script>
 </body>
