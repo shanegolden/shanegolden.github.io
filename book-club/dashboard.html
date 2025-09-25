@@ -24,7 +24,8 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 .match-options { display:flex; flex-wrap:wrap; gap:1rem; margin-top:1rem; }
 .match-options .submission-card { width:200px; flex-direction:column; align-items:center; }
 .match-options .book-info { align-items:center; text-align:center; }
-.disabled { opacity:0.5; cursor:not-allowed; }
+.vote-info { margin-top:0.5rem; color:#333; }
+.winner-display { margin-top:1rem; font-weight:bold; font-size:1.2rem; color:green; }
 </style>
 </head>
 <body>
@@ -34,7 +35,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </header>
 
 <div class="container">
-<h2 id="dynamicSectionTitle">Submit a Book</h2>
+<h2 id="sectionTitle">Submit a Book</h2>
 <div id="submissionForm">
   <input id="bookTitle" placeholder="Book Title" />
   <input id="bookAuthor" placeholder="Author Name" />
@@ -42,6 +43,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </div>
 
 <div id="matchSelection" class="match-options"></div>
+<div id="winnerDisplay" class="winner-display"></div>
 
 <div class="my-submissions">
   <h2>My Submissions</h2>
@@ -52,7 +54,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, query, where, addDoc, getDocs, updateDoc, doc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = { apiKey:"AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0", authDomain:"book-club-f42b1.firebaseapp.com", projectId:"book-club-f42b1", storageBucket:"book-club-f42b1.appspot.com", messagingSenderId:"85630091573", appId:"1:85630091573:web:427077f1351140fc278c7c" };
 const app = initializeApp(firebaseConfig);
@@ -68,66 +70,72 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
   window.location.href = "login.html";
 });
 
-// Auth listener
+// Auth + setup
 onAuthStateChanged(auth, async (user) => {
   if(!user) return window.location.href="login.html";
   currentUser = user;
-  setupSubmissionListener();
-  loadMySubmissions();
+  await setupSubmissionListener();
+  await loadMySubmissions();
 });
 
-// Real-time listener for current period
-function setupSubmissionListener() {
+// Real-time listener for submission periods
+async function setupSubmissionListener() {
   const periodsRef = collection(db,"submissionPeriods");
   onSnapshot(periodsRef, async (snapshot) => {
-    const openPeriod = snapshot.docs.find(d=>d.data().active);
-    const votingPeriod = snapshot.docs.find(d=>d.data().votingActive);
-    
-    if(openPeriod){
-      currentPeriod = { id: openPeriod.id, state:"submission" };
-      document.getElementById("submissionForm").style.display = "block";
-      document.getElementById("dynamicSectionTitle").innerText = "Submit a Book";
-      document.getElementById("matchSelection").innerHTML="";
-    } else if(votingPeriod){
-      currentPeriod = { id: votingPeriod.id, state:"voting" };
-      document.getElementById("submissionForm").style.display = "none";
-      document.getElementById("dynamicSectionTitle").innerText = "Vote for Your Favorite Books (Select up to 3)";
-      displayVotingOptions();
-    } else {
-      const lastPeriod = snapshot.docs.sort((a,b)=>b.data().createdAt?.toMillis()-a.data().createdAt?.toMillis())[0];
-      if(lastPeriod){
-        currentPeriod = { id: lastPeriod.id, state:"closed" };
-        document.getElementById("submissionForm").style.display = "none";
-        document.getElementById("dynamicSectionTitle").innerText = "Voting Closed - Winner";
-        displayWinner(lastPeriod.id);
-      } else {
-        currentPeriod = null;
-        document.getElementById("submissionForm").style.display = "none";
-        document.getElementById("matchSelection").innerHTML="";
-        document.getElementById("dynamicSectionTitle").innerText = "No Active Submission Period";
-      }
+    // Get latest period (most recent created)
+    const periods = snapshot.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>b.createdAt?.toMillis() - a.createdAt?.toMillis());
+    currentPeriod = periods[0] || null;
+
+    const sectionTitle = document.getElementById("sectionTitle");
+    const submissionForm = document.getElementById("submissionForm");
+    const matchSelection = document.getElementById("matchSelection");
+    const winnerDisplay = document.getElementById("winnerDisplay");
+
+    matchSelection.innerHTML = "";
+    winnerDisplay.innerHTML = "";
+
+    if(!currentPeriod) {
+      sectionTitle.innerText = "No Active Submission Period";
+      submissionForm.style.display = "none";
+      return;
     }
-    loadMySubmissions();
+
+    if(currentPeriod.active && !currentPeriod.votingActive) {
+      // State 1: Submissions open
+      sectionTitle.innerText = `Submit a Book (${currentPeriod.name})`;
+      submissionForm.style.display = "block";
+    } else if(!currentPeriod.active && currentPeriod.votingActive) {
+      // State 2: Voting open
+      sectionTitle.innerText = `Voting Open (${currentPeriod.name})`;
+      submissionForm.style.display = "none";
+      await loadVotingOptions();
+    } else if(!currentPeriod.active && !currentPeriod.votingActive) {
+      // State 3: Voting closed
+      sectionTitle.innerText = `Voting Closed (${currentPeriod.name})`;
+      submissionForm.style.display = "none";
+      await displayWinner();
+    }
+    await loadMySubmissions();
   });
 }
 
 // Submit book
-document.getElementById("submitBookBtn").addEventListener("click", async ()=>{
+document.getElementById("submitBookBtn").addEventListener("click", async () => {
   const title = document.getElementById("bookTitle").value.trim();
   const author = document.getElementById("bookAuthor").value.trim();
   if(!title || !author) return alert("Title and author required.");
-  
+
   const q = query(collection(db,"books"), where("submittedBy","==",currentUser.uid), where("periodId","==",currentPeriod.id));
   const existing = await getDocs(q);
   if(!existing.empty) return alert("You already submitted a book for this period.");
 
   const queryStr = `${title} ${author}`;
   let matches = [];
-  try{
+  try {
     const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
     const data = await res.json();
     matches = data.docs.map(d=>({ title:d.title, author:d.author_name?.[0]||"", coverUrl:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:"https://via.placeholder.com/120x180" }));
-  }catch(e){ console.error(e); }
+  } catch(e){ console.error(e); }
   if(matches.length===0) matches.push({title,author,coverUrl:"https://via.placeholder.com/120x180"});
 
   const container = document.getElementById("matchSelection");
@@ -136,109 +144,107 @@ document.getElementById("submitBookBtn").addEventListener("click", async ()=>{
   matches.forEach(b=>{
     const div=document.createElement("div");
     div.className="submission-card";
-    div.innerHTML=`<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><button class="btn btn-primary selectMatch">Select</button></div>`;
+    div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><button class="btn btn-primary selectMatch">Select</button></div>`;
     container.appendChild(div);
 
-    div.querySelector(".selectMatch").addEventListener("click", async (e)=>{
+    div.querySelector(".selectMatch").addEventListener("click", async (e) => {
       e.preventDefault(); e.stopPropagation();
       div.querySelector(".selectMatch").disabled = true;
-      try{
+      try {
         await addDoc(collection(db,"books"),{
           title:b.title, author:b.author, coverUrl:b.coverUrl,
           submittedBy:currentUser.uid, periodId:currentPeriod.id,
           votes:[], createdAt:serverTimestamp()
         });
-        loadMySubmissions();
         container.innerHTML="<p>Book submitted!</p>";
-      }catch(err){ console.error(err); div.querySelector(".selectMatch").disabled=false; alert("Error submitting book."); }
+        await loadMySubmissions();
+      } catch(err) {
+        console.error(err);
+        div.querySelector(".selectMatch").disabled = false;
+        alert("Error submitting book, please try again.");
+      }
     });
   });
 });
 
-// Load my submissions
-async function loadMySubmissions() {
-  if(!currentUser) return;
-  const q = query(collection(db,"books"), where("submittedBy","==",currentUser.uid));
-  const snap = await getDocs(q);
-  const container = document.getElementById("mySubmissionsList");
-  container.innerHTML="";
-  const submissions = snap.docs.map(d=>({id:d.id,...d.data()}))
-                              .sort((a,b)=>(b.createdAt?.toMillis?.()||b.createdAt?.seconds*1000||0) - (a.createdAt?.toMillis?.()||a.createdAt?.seconds*1000||0));
-  submissions.forEach(b=>{
-    const div = document.createElement("div");
-    div.className="submission-card";
-    const canEdit = currentPeriod?.state==="submission";
-    div.innerHTML=`<img src="${b.coverUrl}" class="book-cover"/>
-      <div class="book-info">
-        <h3>${b.title}</h3><p>${b.author}</p>
-        <div class="book-actions">
-          ${canEdit?`<button class="btn btn-primary editBook">Edit</button>
-          <button class="btn btn-primary changeCover">Change Cover</button>
-          <button class="btn btn-danger deleteBook">Delete</button>`:"<span>Editing locked</span>"}
-        </div>
-        <div>Votes: ${b.votes?.length||0}</div>
-      </div>`;
-    container.appendChild(div);
-
-    if(canEdit){
-      div.querySelector(".deleteBook")?.addEventListener("click",async()=>{ await updateDoc(doc(db,"books",b.id),{deleted:true}); loadMySubmissions(); });
-      div.querySelector(".editBook")?.addEventListener("click",()=>{ alert("Editing feature here"); });
-      div.querySelector(".changeCover")?.addEventListener("click",()=>{ alert("Change cover feature here"); });
-    }
-  });
-}
-
-// Display voting options
-async function displayVotingOptions() {
-  const q = query(collection(db,"books"), where("periodId","==",currentPeriod.id));
-  const snap = await getDocs(q);
-  const books = snap.docs.map(d=>({id:d.id,...d.data()}))
-                         .sort((a,b)=>(b.createdAt?.toMillis?.()||b.createdAt?.seconds*1000||0) - (a.createdAt?.toMillis?.()||a.createdAt?.seconds*1000||0)));
+// Voting options
+async function loadVotingOptions() {
+  if(!currentPeriod) return;
   const container = document.getElementById("matchSelection");
-  container.innerHTML="";
+  container.innerHTML="<h3>Vote for up to 3 books:</h3>";
+
+  const booksSnap = await getDocs(query(collection(db,"books"), where("periodId","==",currentPeriod.id)));
+  const books = booksSnap.docs.map(d=>({id:d.id, ...d.data()}));
+
+  // Count votes by this user in this period
+  const userVotesCount = books.filter(b=>b.votes?.includes(currentUser.uid)).length;
+
   books.forEach(b=>{
     const div = document.createElement("div");
     div.className="submission-card";
-    const hasVoted = b.votes?.includes(currentUser.uid)||false;
-    div.innerHTML=`<img src="${b.coverUrl}" class="book-cover"/>
-      <div class="book-info">
-        <h3>${b.title}</h3><p>${b.author}</p>
-        <div>Votes: ${b.votes?.length||0}</div>
-        <button class="btn btn-primary voteBtn" ${hasVoted?"disabled class='disabled'":""}>Vote</button>
-      </div>`;
+    const userAlreadyVoted = b.votes?.includes(currentUser.uid);
+    div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p>
+      <div class="vote-info">Votes: ${b.votes?.length || 0}</div>
+      <button class="btn btn-primary voteBtn" ${userAlreadyVoted || userVotesCount>=3 ? 'disabled' : ''}>Vote</button>
+    </div>`;
     container.appendChild(div);
 
-    div.querySelector(".voteBtn").addEventListener("click", async ()=>{
-      // Fetch user votes for this period
-      const allBooksSnap = await getDocs(q);
-      const votedBooks = allBooksSnap.docs.filter(doc=>doc.data().votes?.includes(currentUser.uid)).map(d=>d.id);
-      if(votedBooks.length>=3) return alert("You can vote for up to 3 books only.");
-      if(b.votes?.includes(currentUser.uid)) return alert("Already voted for this book.");
-      const bookRef = doc(db,"books",b.id);
-      await updateDoc(bookRef,{votes:[...(b.votes||[]),currentUser.uid]});
-      displayVotingOptions(); // refresh
-      loadMySubmissions();
+    div.querySelector(".voteBtn").addEventListener("click", async () => {
+      if(userAlreadyVoted) return;
+      if(userVotesCount>=3) return alert("You can vote for up to 3 books only.");
+
+      await updateDoc(doc(db,"books",b.id), { votes: [...(b.votes||[]), currentUser.uid] });
+      div.querySelector(".voteBtn").disabled=true;
+      div.querySelector(".vote-info").innerText = `Votes: ${(b.votes?.length||0)+1}`;
+      await loadVotingOptions(); // Refresh buttons to respect max 3 votes
     });
   });
 }
 
-// Display winner
-async function displayWinner(periodId) {
-  const q = query(collection(db,"books"), where("periodId","==",periodId));
-  const snap = await getDocs(q);
-  const books = snap.docs.map(d=>({id:d.id,...d.data()}));
-  if(books.length===0) return document.getElementById("matchSelection").innerHTML="<p>No submissions</p>";
-  const maxVotes = Math.max(...books.map(b=>b.votes?.length||0));
-  const winners = books.filter(b=>(b.votes?.length||0)===maxVotes);
-  const container = document.getElementById("matchSelection");
+// My submissions (chronological, newest first)
+async function loadMySubmissions() {
+  if(!currentUser || !currentPeriod) return;
+  const container = document.getElementById("mySubmissionsList");
   container.innerHTML="";
-  winners.forEach(b=>{
+  const booksSnap = await getDocs(query(collection(db,"books"), where("submittedBy","==",currentUser.uid), where("periodId","==",currentPeriod.id)));
+  const books = booksSnap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.createdAt?.toMillis() - a.createdAt?.toMillis());
+
+  books.forEach(b=>{
     const div = document.createElement("div");
     div.className="submission-card";
-    div.innerHTML=`<img src="${b.coverUrl}" class="book-cover"/>
-      <div class="book-info"><h3>${b.title}</h3><p>${b.author}</p><div>Votes: ${b.votes?.length||0}</div></div>`;
+    const canEdit = currentPeriod.active && !currentPeriod.votingActive;
+    div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p>
+      ${canEdit ? `<div class="book-actions">
+        <button class="btn btn-primary editBtn">Edit</button>
+        <button class="btn btn-danger deleteBtn">Delete</button>
+      </div>` : ""}
+    </div>`;
     container.appendChild(div);
+
+    if(canEdit){
+      div.querySelector(".deleteBtn").addEventListener("click", async ()=>{
+        if(confirm("Delete this book?")) await deleteDoc(doc(db,"books",b.id));
+        await loadMySubmissions();
+      });
+      div.querySelector(".editBtn").addEventListener("click", async ()=>{
+        const newTitle = prompt("New title:", b.title);
+        const newAuthor = prompt("New author:", b.author);
+        if(!newTitle || !newAuthor) return;
+        await updateDoc(doc(db,"books",b.id), {title:newTitle, author:newAuthor});
+        await loadMySubmissions();
+      });
+    }
   });
+}
+
+// Display winner
+async function displayWinner() {
+  const container = document.getElementById("winnerDisplay");
+  const booksSnap = await getDocs(query(collection(db,"books"), where("periodId","==",currentPeriod.id)));
+  const books = booksSnap.docs.map(d=>({id:d.id, ...d.data()}));
+  if(books.length===0){ container.innerText="No submissions."; return; }
+  const winner = books.sort((a,b)=>(b.votes?.length||0)-(a.votes?.length||0))[0];
+  container.innerText = `Winner: ${winner.title} by ${winner.author} with ${winner.votes?.length||0} votes`;
 }
 </script>
 </body>
