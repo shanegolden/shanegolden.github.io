@@ -28,7 +28,7 @@
 </head>
 <body>
 <header>
-  <h1>📚 Book Club Dashboard!</h1>
+  <h1>📚 Book Club Dashboard</h1>
   <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -104,7 +104,6 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
   const existing = await getDocs(q);
   if(!existing.empty) return alert("You already submitted a book for this period.");
 
-  // Fetch matches
   const queryStr = `${title} ${author}`;
   let matches=[];
   try {
@@ -120,6 +119,7 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
 
   const container = document.getElementById("matchSelection");
   container.innerHTML="<h3>Select the correct match:</h3>";
+
   matches.forEach(b=>{
     const div=document.createElement("div");
     div.className="submission-card";
@@ -133,7 +133,6 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
     `;
     container.appendChild(div);
 
-    // MOBILE-FRIENDLY SELECT
     const selectBtn = div.querySelector(".selectMatch");
     const submitBook = async () => {
       const docRef = await addDoc(collection(db,"books"),{
@@ -148,9 +147,10 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
       container.innerHTML="<p>Book submitted!</p>";
     };
 
-    // pointerup works reliably on mobile; keyup for accessibility
-    selectBtn.addEventListener("pointerup", submitBook);
-    selectBtn.addEventListener("keyup", e => { if(e.key==="Enter") submitBook(); });
+    // Mobile-friendly event listeners
+    selectBtn.addEventListener("pointerdown", submitBook);
+    selectBtn.addEventListener("touchend", submitBook);
+    selectBtn.addEventListener("click", submitBook);
   });
 });
 
@@ -178,7 +178,7 @@ function addSubmissionToList(b) {
   const div = document.createElement("div");
   div.className = "submission-card";
 
-  const isEditable = b.periodId === currentPeriodId; // only editable during the active period
+  const isEditable = b.periodId === currentPeriodId;
 
   div.innerHTML = `
     <img src="${b.coverUrl}" class="book-cover"/>
@@ -192,7 +192,7 @@ function addSubmissionToList(b) {
   `;
   container.prepend(div);
 
-  if (!isEditable) return; // do not attach event listeners if not editable
+  if (!isEditable) return;
 
   // Delete book
   div.querySelector(".deleteBook").addEventListener("click", async () => {
