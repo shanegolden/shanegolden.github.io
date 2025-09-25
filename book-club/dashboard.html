@@ -7,11 +7,15 @@
   <style>
     .book-card { display: flex; align-items: center; margin: 5px 0; }
     .book-card img { width: 50px; height: 75px; object-fit: cover; margin-right: 10px; }
+    .edit-section { margin-left: 60px; margin-top: 5px; }
     button { margin: 2px; }
+    .alt-book { display: flex; align-items: center; margin: 3px 0; }
+    .alt-book img { width: 40px; height: 60px; object-fit: cover; margin-right: 5px; cursor: pointer; border: 2px solid transparent; }
+    .alt-book.selected img { border-color: green; }
   </style>
 </head>
 <body>
-  <h1>📚 Book Club Dashboard!</h1>
+  <h1>📚 Book Club Dashboard</h1>
   <button id="logoutBtn">Log Out</button>
   <hr>
 
@@ -24,7 +28,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 import { 
-  getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp, onSnapshot 
+  getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp, onSnapshot, doc, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -44,33 +48,30 @@ const db = getFirestore(app);
 let currentUser;
 let latestPeriodId = null;
 
-// Logout
 document.getElementById("logoutBtn").addEventListener("click", () => signOut(auth));
 
-// Protect page and load data
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = "login.html"; return; }
   currentUser = user;
-  loadSubmissionPeriods();
+  listenSubmissionPeriods();
   loadUserSubmissions();
 });
 
 // Listen to submission periods in real-time
-function loadSubmissionPeriods() {
-  const periodsCol = collection(db, "submissionsPeriods");
-  onSnapshot(periodsCol, snapshot => {
+function listenSubmissionPeriods() {
+  onSnapshot(collection(db, "submissionsPeriods"), snapshot => {
     if (snapshot.empty) {
       document.getElementById("submissionStatus").innerText = "No submission period available.";
       document.getElementById("submissionFormContainer").innerHTML = "";
       return;
     }
 
-    // Get latest period
-    const sortedPeriods = snapshot.docs.sort((a,b) => a.data().startTime?.seconds - b.data().startTime?.seconds);
-    const latestPeriod = sortedPeriods[sortedPeriods.length - 1].data();
-    latestPeriodId = sortedPeriods[sortedPeriods.length - 1].id;
+    const sorted = snapshot.docs.sort((a,b) => a.data().startTime?.seconds - b.data().startTime?.seconds);
+    const latest = sorted[sorted.length - 1];
+    latestPeriodId = latest.id;
+    const latestData = latest.data();
 
-    if (latestPeriod.open) {
+    if (latestData.open) {
       document.getElementById("submissionStatus").innerText = "Book submissions are OPEN!";
       showSubmissionForm();
     } else {
@@ -80,7 +81,6 @@ function loadSubmissionPeriods() {
   });
 }
 
-// Show form if user hasn’t submitted yet in this period
 async function showSubmissionForm() {
   const q = query(collection(db, "books"), where("submittedBy", "==", currentUser.uid), where("periodId", "==", latestPeriodId));
   const submittedSnap = await getDocs(q);
@@ -98,11 +98,9 @@ async function showSubmissionForm() {
     <input id="bookISBN" placeholder="ISBN (optional)" />
     <button id="submitBookBtn">Submit Book</button>
   `;
-
   document.getElementById("submitBookBtn").addEventListener("click", submitBook);
 }
 
-// Submit book function with auto-matching
 async function submitBook() {
   const titleInput = document.getElementById("bookTitle").value.trim();
   const authorInput = document.getElementById("bookAuthor").value.trim();
@@ -110,46 +108,113 @@ async function submitBook() {
 
   if (!titleInput || !authorInput) { alert("Title and author required"); return; }
 
-  // Fetch matching info from Open Library
-  let title = titleInput, author = authorInput, coverUrl = "";
-  if (isbnInput) {
+  let matchedBook = await fetchMatchedBook(titleInput, authorInput, isbnInput);
+
+  await addDoc(collection(db, "books"), {
+    title: matchedBook.title,
+    author: matchedBook.author,
+    coverUrl: matchedBook.coverUrl,
+    submittedBy: currentUser.uid,
+    periodId: latestPeriodId,
+    votes: 0,
+    createdAt: serverTimestamp(),
+    alternatives: matchedBook.alternatives
+  });
+
+  showSubmissionForm();
+  loadUserSubmissions();
+}
+
+async function fetchMatchedBook(title, author, isbn) {
+  let coverUrl = "";
+  const alternatives = [];
+
+  if (isbn) {
     try {
-      const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbnInput}&format=json&jscmd=data`);
+      const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
       const data = await res.json();
-      const key = `ISBN:${isbnInput}`;
+      const key = `ISBN:${isbn}`;
       if (data[key]) {
         title = data[key].title || title;
         author = data[key].authors?.[0]?.name || author;
         coverUrl = data[key].cover?.medium || "";
+        alternatives.push({ title, author, coverUrl });
       }
-    } catch (err) { console.error("Error fetching book info:", err); }
+    } catch (err) { console.error(err); }
   }
 
-  await addDoc(collection(db, "books"), {
-    title, author, coverUrl, submittedBy: currentUser.uid, periodId: latestPeriodId, votes: 0, createdAt: serverTimestamp()
-  });
+  // If ISBN didn't give results, query Open Library search
+  if (!coverUrl) {
+    try {
+      const res = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&limit=5`);
+      const data = await res.json();
+      if (data.docs.length > 0) {
+        data.docs.forEach(doc => {
+          if (doc.title) {
+            alternatives.push({
+              title: doc.title,
+              author: doc.author_name?.[0] || author,
+              coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : ""
+            });
+          }
+        });
+      }
+    } catch (err) { console.error(err); }
+  }
 
-  alert(`Book "${title}" submitted!`);
-  showSubmissionForm(); // Hide form after submission
-  loadUserSubmissions(); // Refresh user submissions
+  return { title: alternatives[0]?.title || title, author: alternatives[0]?.author || author, coverUrl: alternatives[0]?.coverUrl || "", alternatives };
 }
 
-// Show user’s previous submissions
+// Load user submissions
 async function loadUserSubmissions() {
   const container = document.getElementById("yourSubmissions");
-  const booksSnap = await getDocs(query(collection(db, "books"), where("submittedBy", "==", currentUser.uid)));
   container.innerHTML = "";
+  const booksSnap = await getDocs(query(collection(db, "books"), where("submittedBy", "==", currentUser.uid)));
+  
   booksSnap.docs.sort((a,b) => a.data().createdAt?.seconds - b.data().createdAt?.seconds).forEach(docSnap => {
     const book = docSnap.data();
     const div = document.createElement("div");
     div.classList.add("book-card");
     div.innerHTML = `
       <img src="${book.coverUrl || ''}" alt="cover"/>
-      <div><b>${book.title}</b> by ${book.author}</div>
+      <div>
+        <b>${book.title}</b> by ${book.author}
+        <div class="edit-section">
+          <button class="editBtn">Edit Match</button>
+          <div class="editOptions" style="display:none;"></div>
+        </div>
+      </div>
     `;
+    container.appendChild(div);
+
+    const editBtn = div.querySelector(".editBtn");
+    const editOptions = div.querySelector(".editOptions");
+
+    editBtn.addEventListener("click", () => {
+      editOptions.style.display = editOptions.style.display === "none" ? "block" : "none";
+      showAlternatives(editOptions, docSnap.id, book.alternatives);
+    });
+  });
+}
+
+// Show alternative matches and allow selecting cover
+function showAlternatives(container, bookId, alternatives) {
+  container.innerHTML = "";
+  alternatives.forEach((alt, idx) => {
+    const div = document.createElement("div");
+    div.classList.add("alt-book");
+    div.innerHTML = `<img src="${alt.coverUrl || ''}" /><span>${alt.title} by ${alt.author}</span>`;
+    div.addEventListener("click", async () => {
+      // Update selection
+      alternatives.forEach((a,i)=>{container.children[i].classList.remove("selected")});
+      div.classList.add("selected");
+      await updateDoc(doc(db, "books", bookId), { title: alt.title, author: alt.author, coverUrl: alt.coverUrl });
+      loadUserSubmissions(); // Refresh display
+    });
     container.appendChild(div);
   });
 }
+
 </script>
 </body>
 </html>
