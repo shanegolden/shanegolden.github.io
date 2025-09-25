@@ -14,7 +14,8 @@
   .btn-danger { background:#e94b3c; color:white; }
   .container { max-width:900px; margin:2rem auto; padding:1rem; background:white; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
   input { padding:0.5rem; width:100%; margin:0.5rem 0; border-radius:5px; border:1px solid #ccc; }
-  .submission-card { display:flex; gap:1rem; margin:1rem 0; background:#f0f4f8; padding:0.5rem; border-radius:8px; }
+  .submission-card { display:flex; gap:1rem; margin:1rem 0; background:#f0f4f8; padding:0.5rem; border-radius:8px; transition: transform 0.2s ease; }
+  .submission-card:hover { transform: translateY(-2px); }
   .submission-card img.book-cover { width:120px; height:180px; object-fit:cover; border-radius:5px; }
   .book-info { flex:1; display:flex; flex-direction:column; justify-content:space-between; }
   .my-submissions { margin-top:2rem; }
@@ -26,7 +27,7 @@
 </head>
 <body>
 <header>
-  <h1>📚 Book Club Dashboard</h1>
+  <h1>📚 Book Club Dashboard!</h1>
   <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -49,7 +50,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-import { getFirestore, collection, query, where, addDoc, getDocs, serverTimestamp, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, addDoc, getDocs, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARFfiXUa27jTt2nfuStSGZL4HCCp5oPx0",
@@ -76,72 +77,52 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 // Load user & submission period
 onAuthStateChanged(auth, async (user) => {
   if (!user) return window.location.href="login.html";
-  currentUser = user;
+  currentUser=user;
+  await loadSubmissionStatus();
+  await loadMySubmissions();
+});
 
-  // Get active submission period
+async function loadSubmissionStatus() {
   const periodsSnap = await getDocs(collection(db,"submissionPeriods"));
   const openPeriod = periodsSnap.docs.find(d=>d.data().active);
   if(openPeriod){
-    currentPeriodId = openPeriod.id;
+    currentPeriodId=openPeriod.id;
     document.getElementById("submissionForm").style.display="block";
   } else {
-    currentPeriodId = null;
     document.getElementById("submissionForm").style.display="none";
   }
-
-  // Real-time listener for user's submissions
-  const q = query(collection(db,"books"), where("submittedBy","==",currentUser.uid), orderBy("createdAt","desc"));
-  onSnapshot(q, snap => {
-    const container = document.getElementById("mySubmissionsList");
-    container.innerHTML = "";
-    snap.docs.forEach(docSnap => {
-      const b = docSnap.data();
-      const div = document.createElement("div");
-      div.className = "submission-card";
-      div.innerHTML = `
-        <img src="${b.coverUrl}" class="book-cover"/>
-        <div class="book-info">
-          <h3>${b.title}</h3>
-          <p>${b.author}</p>
-        </div>
-      `;
-      container.appendChild(div);
-    });
-  });
-});
+}
 
 // Submit book
 document.getElementById("submitBookBtn").addEventListener("click", async () => {
-  const title = document.getElementById("bookTitle").value.trim();
-  const author = document.getElementById("bookAuthor").value.trim();
-  if(!title || !author) return alert("Title and author required.");
-  if(!currentPeriodId) return alert("No active submission period.");
+  const title=document.getElementById("bookTitle").value.trim();
+  const author=document.getElementById("bookAuthor").value.trim();
+  if(!title||!author) return alert("Title and author required.");
 
-  // Prevent double submissions
-  const existingSnap = await getDocs(query(collection(db,"books"), where("submittedBy","==",currentUser.uid), where("periodId","==",currentPeriodId)));
-  if(!existingSnap.empty) return alert("You already submitted a book for this period.");
+  const q=query(collection(db,"books"), where("submittedBy","==",currentUser.uid), where("periodId","==",currentPeriodId));
+  const existing = await getDocs(q);
+  if(!existing.empty) return alert("You already submitted a book for this period.");
 
-  // Fetch matches from Open Library
+  // Fetch matches
   const queryStr = `${title} ${author}`;
-  let matches = [];
+  let matches=[];
   try {
     const res = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(queryStr)}&limit=5`);
     const data = await res.json();
-    matches = data.docs.map(d => ({
-      title: d.title,
-      author: d.author_name?.[0] || "",
-      coverUrl: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "https://via.placeholder.com/120x180"
+    matches = data.docs.map(d=>({
+      title:d.title,
+      author:d.author_name?.[0]||"",
+      coverUrl:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:"https://via.placeholder.com/120x180"
     }));
   } catch(e){ console.error(e); }
-
-  if(matches.length===0) matches.push({title, author, coverUrl:"https://via.placeholder.com/120x180"});
+  if(matches.length===0) matches.push({title,author,coverUrl:"https://via.placeholder.com/120x180"});
 
   const container = document.getElementById("matchSelection");
-  container.innerHTML = "<h3>Select the correct match:</h3>";
-  matches.forEach(b => {
-    const div = document.createElement("div");
-    div.className = "submission-card";
-    div.innerHTML = `
+  container.innerHTML="<h3>Select the correct match:</h3>";
+  matches.forEach(b=>{
+    const div=document.createElement("div");
+    div.className="submission-card";
+    div.innerHTML=`
       <img src="${b.coverUrl}" class="book-cover"/>
       <div class="book-info">
         <h3>${b.title}</h3>
@@ -150,20 +131,50 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
       </div>
     `;
     container.appendChild(div);
-
-    div.querySelector(".selectMatch").addEventListener("click", async () => {
-      await addDoc(collection(db,"books"), {
-        title: b.title,
-        author: b.author,
-        coverUrl: b.coverUrl,
-        submittedBy: currentUser.uid,
-        periodId: currentPeriodId,
-        createdAt: serverTimestamp()
+    div.querySelector(".selectMatch").addEventListener("click", async ()=>{
+      // Add book to Firestore
+      const docRef = await addDoc(collection(db,"books"),{
+        title:b.title,
+        author:b.author,
+        coverUrl:b.coverUrl,
+        submittedBy:currentUser.uid,
+        periodId:currentPeriodId,
+        createdAt:serverTimestamp()
       });
-      container.innerHTML = "<p>Book submitted!</p>";
+      // Immediately show it
+      addSubmissionToList({id: docRef.id, ...b});
+      container.innerHTML="<p>Book submitted!</p>";
     });
   });
 });
+
+// Load my submissions
+async function loadMySubmissions() {
+  if(!currentUser) return;
+  const q=query(collection(db,"books"), where("submittedBy","==",currentUser.uid), orderBy("createdAt","desc"));
+  const snap=await getDocs(q);
+  const container=document.getElementById("mySubmissionsList");
+  container.innerHTML="";
+  snap.docs.forEach(docSnap=>{
+    const b=docSnap.data();
+    addSubmissionToList({id: docSnap.id, ...b});
+  });
+}
+
+// Helper to add a submission to the UI
+function addSubmissionToList(b) {
+  const container=document.getElementById("mySubmissionsList");
+  const div=document.createElement("div");
+  div.className="submission-card";
+  div.innerHTML=`
+    <img src="${b.coverUrl}" class="book-cover"/>
+    <div class="book-info">
+      <h3>${b.title}</h3>
+      <p>${b.author}</p>
+    </div>
+  `;
+  container.prepend(div); // show newest on top
+}
 </script>
 </body>
 </html>
