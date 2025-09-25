@@ -31,7 +31,7 @@ h2 { border-bottom:1px solid #ccc; padding-bottom:0.5rem; }
 </head>
 <body>
 <header>
-<h1>📚 Club Dashboard!</h1>
+<h1>📚 Club Dashboard</h1>
 <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -205,13 +205,23 @@ async function loadMySubmissions() {
   if(!currentUser) return;
   const container = document.getElementById("mySubmissionsList");
   container.innerHTML="";
+
+  // Load all books submitted by this user
   const booksSnap = await getDocs(query(collection(db,"books"), where("submittedBy","==",currentUser.uid)));
   const books = booksSnap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.createdAt?.toMillis() - a.createdAt?.toMillis());
+
+  // Load all submission periods for reference
+  const periodsSnap = await getDocs(collection(db,"submissionPeriods"));
+  const periods = periodsSnap.docs.map(d=>({id:d.id, ...d.data()}));
 
   books.forEach(b=>{
     const div = document.createElement("div");
     div.className="submission-card";
-    const canEdit = currentPeriod && currentPeriod.active && !currentPeriod.votingActive;
+
+    // Determine if book's period is still editable (period exists and active & not voting)
+    const bookPeriod = periods.find(p=>p.id === b.periodId);
+    const canEdit = bookPeriod && bookPeriod.active && !bookPeriod.votingActive;
+
     div.innerHTML = `<img src="${b.coverUrl}" class="book-cover"/><div class="book-info"><h3>${b.title}</h3><p>${b.author}</p>
       ${canEdit ? `<div class="book-actions">
         <button class="btn btn-primary editBtn">Edit</button>
@@ -235,6 +245,7 @@ async function loadMySubmissions() {
     }
   });
 }
+
 
 // Display winner
 async function displayWinner() {
