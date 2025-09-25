@@ -28,7 +28,7 @@
 </head>
 <body>
 <header>
-  <h1>📚 Book Club Dashboard</h1>
+  <h1>📚 Book Club Dashboard!</h1>
   <button id="logoutBtn" class="btn-danger">Logout</button>
 </header>
 
@@ -132,27 +132,31 @@ document.getElementById("submitBookBtn").addEventListener("click", async () => {
       </div>
     `;
     container.appendChild(div);
-
+  
     const selectBtn = div.querySelector(".selectMatch");
-    const submitBook = async () => {
-      const docRef = await addDoc(collection(db,"books"),{
-        title:b.title,
-        author:b.author,
-        coverUrl:b.coverUrl,
-        submittedBy:currentUser.uid,
-        periodId:currentPeriodId,
-        createdAt:serverTimestamp()
-      });
-      addSubmissionToList({id: docRef.id, periodId: currentPeriodId, ...b});
-      container.innerHTML="<p>Book submitted!</p>";
-    };
-
-    // Mobile-friendly event listeners
-    selectBtn.addEventListener("pointerdown", submitBook);
-    selectBtn.addEventListener("touchend", submitBook);
-    selectBtn.addEventListener("click", submitBook);
+    selectBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation(); // stop any parent handlers from blocking this
+      selectBtn.disabled = true; // prevent double clicks
+      try {
+        const docRef = await addDoc(collection(db,"books"),{
+          title:b.title,
+          author:b.author,
+          coverUrl:b.coverUrl,
+          submittedBy:currentUser.uid,
+          periodId:currentPeriodId,
+          createdAt:serverTimestamp()
+        });
+        addSubmissionToList({id: docRef.id, periodId: currentPeriodId, ...b});
+        container.innerHTML="<p>Book submitted!</p>";
+      } catch(err) {
+        console.error(err);
+        selectBtn.disabled = false;
+        alert("Error submitting book, please try again.");
+      }
+    });
   });
-});
+
 
 // Load all my submissions
 async function loadMySubmissions() {
