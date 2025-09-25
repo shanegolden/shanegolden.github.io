@@ -5,96 +5,147 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Book Club</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
+    * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      background-color: #f5f5f7;
+      color: #1d1d1f;
       display: flex;
       flex-direction: column;
       align-items: center;
-      background-color: #f5f5f5;
-      color: #333;
+      justify-content: center;
+      height: 100vh;
     }
 
     header {
-      width: 100%;
-      padding: 1rem;
-      background-color: #4a90e2;
-      color: #fff;
       text-align: center;
-      font-size: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .logo {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 0.75rem;
+    }
+
+    .title {
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #1d1d1f;
     }
 
     main {
-      max-width: 500px;
-      width: 90%;
-      margin-top: 2rem;
       background-color: #fff;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 3rem 2rem;
+      border-radius: 20px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
     }
 
     h2 {
-      margin-top: 0;
-      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+      color: #1d1d1f;
     }
 
     input {
       width: 100%;
-      padding: 0.7rem;
-      margin: 0.5rem 0;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
+      padding: 0.9rem 1rem;
+      margin: 0.6rem 0;
+      border-radius: 12px;
+      border: 1px solid #d2d2d7;
+      background-color: #f5f5f7;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #0071e3;
+      background-color: #fff;
+      box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.3);
     }
 
     button {
       width: 100%;
-      padding: 0.7rem;
-      background-color: #4a90e2;
+      padding: 0.9rem;
+      margin-top: 1rem;
+      background-color: #0071e3;
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: 12px;
       font-size: 1rem;
+      font-weight: 500;
       cursor: pointer;
-      margin-top: 0.5rem;
+      transition: background-color 0.2s ease;
     }
 
     button:hover {
-      background-color: #357abd;
-    }
-
-    p.message {
-      text-align: center;
-      color: red;
-      margin-top: 1rem;
+      background-color: #005bb5;
     }
 
     .login-signup-tabs {
+      position: relative;
       display: flex;
       justify-content: space-around;
-      margin-bottom: 1rem;
-      cursor: pointer;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      border-bottom: 1px solid #d2d2d7;
     }
 
     .login-signup-tabs div {
       padding: 0.5rem 1rem;
-      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      color: #6e6e73;
+      transition: color 0.2s ease;
+      z-index: 1;
     }
 
     .login-signup-tabs .active {
-      border-bottom: 2px solid #4a90e2;
-      font-weight: bold;
+      color: #1d1d1f;
+    }
+
+    .tab-underline {
+      position: absolute;
+      bottom: 0;
+      height: 2px;
+      width: 50%;
+      background-color: #0071e3;
+      transition: transform 0.3s ease;
+      border-radius: 2px 2px 0 0;
+    }
+
+    p.message {
+      text-align: center;
+      color: #e30000;
+      margin-top: 1.2rem;
+      font-size: 0.9rem;
     }
   </style>
 </head>
 <body>
-  <header>📚 Club</header>
+  <header>
+    <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 19.5V6.75C4 5.645 4.895 4.75 6 4.75h12c1.105 0 2 .895 2 2v12.75M4 19.5c0 1.105.895 2 2 2h6M4 19.5h6m0 0V6.75m0 14.75h6c1.105 0 2-.895 2-2M12 21.5V6.75" />
+    </svg>
+    <div class="title">Book Club</div>
+  </header>
+
   <main>
     <div class="login-signup-tabs">
       <div id="tabLogin" class="active">Log In</div>
       <div id="tabSignup">Sign Up</div>
+      <div class="tab-underline"></div>
     </div>
 
     <div id="authForm"></div>
@@ -124,12 +175,13 @@
   const messageP = document.getElementById("message");
   const tabSignup = document.getElementById("tabSignup");
   const tabLogin = document.getElementById("tabLogin");
+  const tabUnderline = document.querySelector(".tab-underline");
 
-  // Render signup form
   function renderSignup() {
     authFormDiv.innerHTML = `
+      <h2>Create Account</h2>
       <input id="name" placeholder="Full name" />
-      <input id="email" placeholder="Email" />
+      <input id="email" placeholder="Email" type="email" />
       <input id="password" placeholder="Password" type="password" />
       <button id="signupBtn">Sign Up</button>
     `;
@@ -165,10 +217,10 @@
     });
   }
 
-  // Render login form
   function renderLogin() {
     authFormDiv.innerHTML = `
-      <input id="loginEmail" placeholder="Email" />
+      <h2>Welcome Back</h2>
+      <input id="loginEmail" placeholder="Email" type="email" />
       <input id="loginPassword" placeholder="Password" type="password" />
       <button id="loginBtn">Log In</button>
     `;
@@ -196,11 +248,10 @@
           return;
         }
 
-        // Redirect based on role
         if (data.role === "admin") {
-          window.location.href = "admin.html";
+          window.location.href = "/books/admin.html";
         } else {
-          window.location.href = "dashboard.html";
+          window.location.href = "/books/dashboard.html";
         }
       } catch (err) {
         console.error(err);
@@ -209,21 +260,30 @@
     });
   }
 
-  // Tabs logic
+  function moveUnderline(tab) {
+    if (tab === "login") {
+      tabUnderline.style.transform = "translateX(0%)";
+    } else {
+      tabUnderline.style.transform = "translateX(100%)";
+    }
+  }
+
   tabSignup.addEventListener("click", () => {
     tabSignup.classList.add("active");
     tabLogin.classList.remove("active");
+    moveUnderline("signup");
     renderSignup();
   });
 
   tabLogin.addEventListener("click", () => {
     tabLogin.classList.add("active");
     tabSignup.classList.remove("active");
+    moveUnderline("login");
     renderLogin();
   });
 
-  // Default load login
   renderLogin();
+  moveUnderline("login");
 </script>
 </body>
 </html>
