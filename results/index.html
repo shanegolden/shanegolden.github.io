@@ -347,6 +347,57 @@
  
    <!-- end review 5 section -->
 
+   <!-- review 6 section -->
+ <section id="review-2" class="about2_section layout_padding">
+   <div class="container">
+     <div class="heading_container heading_center"></div>
+     <div class="row">
+        <!-- Text column first -->
+        <div class="col-md-6 order-2 order-md-1">
+                <div class="detail-box">
+            <h3>
+              <a href="https://www.linkedin.com/in/shawnmayzes/" target="_blank" style="all: unset; cursor: pointer; color: inherit;">Shawn Mayzes</a>
+            </h3>
+            <h5>
+              <a href="https://www.jetpacklabs.com/" target="_blank" style="all: unset; cursor: pointer; color: inherit;">Founder, Jetpack Labs</a>
+            </h5>
+  
+            <!-- Snippet shown by default -->
+            <p>I’ve had the privilege of working closely with Shane, and I can confidently say he brings a rare mix of financial expertise, operational excellence, and creative thinking to every challenge.</p>
+  
+            <!-- Hidden content until "Read more" is clicked -->
+            <div class="more-text" style="display: none;">
+              <p>His finance prowess allows him to see both the big picture and the fine details, ensuring decisions are grounded in smart strategy and long-term value. On the operational side, he has a talent for streamlining processes, aligning teams, and keeping complex initiatives moving with clarity and precision.</p>
+              <p>Together, these strengths make him not only a trusted leader but also someone who consistently drives meaningful results.</p>
+            </div>
+  
+            <!-- Read more toggle -->
+            <button onclick="toggleReview(this)" class="read-more-btn" style="border: none; background: none; color: #007bff; padding: 0; cursor: pointer;">Read more</button>
+          </div>
+        </div>
+  
+        <!-- Image column second -->
+        <div class="col-md-6 order-1 order-md-2">
+          <div class="img-box" style="margin-bottom: 30px;">
+           <img src="/images/r6-shawn.png" alt="Image of Shawn Mayzes">
+          </div>
+        </div>
+    </div>
+  </div>
+</section>
+  
+  <!-- Toggle script -->
+  <script>
+    function toggleReview(button) {
+      const moreText = button.previousElementSibling;
+      const isVisible = moreText.style.display === "block";
+  
+      moreText.style.display = isVisible ? "none" : "block";
+      button.textContent = isVisible ? "Read more" : "Show less";
+    }
+  </script>
+  <!-- end review 6 section -->
+
 
   <!-- info section -->
 
