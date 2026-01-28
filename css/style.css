@@ -1038,4 +1038,9 @@ a:focus {
   margin-top: 50px !important;
 }
 
+.slider_section .img-box img {
+  position: relative;
+  z-index: 20 !important;
+}
+
 /* End Fix slider height jumping */
