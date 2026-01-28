@@ -979,3 +979,32 @@ a:focus {
   color: inherit;
 }
 /*# sourceMappingURL=style.css.map */
+
+/* Fix slider height jumping */
+.slider_section {
+  min-height: 650px;
+}
+
+.slider_section .carousel-inner,
+.slider_section .carousel-item {
+  min-height: 650px;
+}
+
+.slider_section .carousel-item .row {
+  min-height: 650px;
+  align-items: center;
+}
+
+.slider_section .img-box {
+  height: 450px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slider_section .img-box img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+/* End Fix slider height jumping */
