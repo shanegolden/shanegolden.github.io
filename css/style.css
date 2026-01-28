@@ -1009,6 +1009,15 @@ a:focus {
     padding: 30px 0 80px 0;
   }
   
+  .slider_section .carousel-inner,
+  .slider_section .carousel-item {
+    min-height: 550px;  /* Add this line */
+  }
+  
+  .slider_section .carousel-item .row {
+    min-height: 550px;  /* Add this line */
+  }
+  
   .slider_section .img-box {
     height: 250px;
     margin: 20px 0;
