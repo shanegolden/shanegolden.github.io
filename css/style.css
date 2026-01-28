@@ -982,21 +982,21 @@ a:focus {
 
 /* Fix slider height jumping */
 .slider_section {
-  min-height: 650px;
+  min-height: 500px;
 }
 
 .slider_section .carousel-inner,
 .slider_section .carousel-item {
-  min-height: 650px;
+  min-height: 500px;
 }
 
 .slider_section .carousel-item .row {
-  min-height: 650px;
+  min-height: 500px;
   align-items: center;
 }
 
 .slider_section .img-box {
-  height: 450px;
+  height: 350px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1006,5 +1006,31 @@ a:focus {
   max-height: 100%;
   max-width: 100%;
   object-fit: contain;
+  animation: none; /* Disable the floating animation to prevent jumping */
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+  .slider_section {
+    min-height: 400px;
+    padding: 30px 0 80px 0;
+  }
+  
+  .slider_section .carousel-inner,
+  .slider_section .carousel-item {
+    min-height: 400px;
+  }
+  
+  .slider_section .carousel-item .row {
+    min-height: 400px;
+  }
+  
+  .slider_section .img-box {
+    height: 250px;
+  }
+  
+  .slider_section .detail-box h1 {
+    font-size: 2rem;
+  }
 }
 /* End Fix slider height jumping */
