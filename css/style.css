@@ -1033,9 +1033,8 @@ a:focus {
 }
 
 .slider_section .carousel-indicators {
-  z-index: 10 !important;
   position: relative;
-  margin-top: 50px !important;
+  margin-top: 80px !important;
 }
 
 .slider_section .img-box img {
