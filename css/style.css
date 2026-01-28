@@ -998,8 +998,8 @@ a:focus {
   max-height: 100%;
   width: auto;
   object-fit: contain;
-  -webkit-animation: upDown 5s infinite;
-  animation: upDown 5s infinite;
+  -webkit-animation: upDown 5s infinite !important;
+  animation: upDown 5s infinite !important;
 }
 
 /* Mobile slider fixes */
@@ -1011,11 +1011,11 @@ a:focus {
   
   .slider_section .carousel-inner,
   .slider_section .carousel-item {
-    min-height: 550px;  /* Add this line */
+    min-height: 550px; 
   }
   
   .slider_section .carousel-item .row {
-    min-height: 550px;  /* Add this line */
+    min-height: 550px;  
   }
   
   .slider_section .img-box {
