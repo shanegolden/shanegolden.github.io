@@ -998,6 +998,8 @@ a:focus {
   max-height: 100%;
   width: auto;
   object-fit: contain;
+  -webkit-animation: upDown 5s infinite;
+  animation: upDown 5s infinite;
 }
 
 /* Mobile slider fixes */
