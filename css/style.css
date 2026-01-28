@@ -1031,8 +1031,13 @@ a:focus {
 }
 
 .slider_section .carousel-indicators {
+  z-index: 10 !important;
+  position: relative;
   margin-top: 50px !important;
-  position: relative !important;
+}
+
+.slider_section .img-box {
+  margin-bottom: 60px !important;
 }
 
 /* End Fix slider height jumping */
