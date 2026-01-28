@@ -1030,4 +1030,8 @@ a:focus {
   }
 }
 
+.slider_section .carousel-indicators {
+  margin-top: 30px;
+}
+
 /* End Fix slider height jumping */
