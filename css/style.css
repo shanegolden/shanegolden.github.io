@@ -1031,8 +1031,8 @@ a:focus {
 }
 
 .slider_section .carousel-indicators {
-  position: relative;
-  top: 30px;
+  margin-top: 50px !important;
+  position: relative !important;
 }
 
 /* End Fix slider height jumping */
