@@ -337,8 +337,18 @@ a:focus {
   margin: 45px 0;
 }
 
+.slider_section .img-box {
+  height: 350px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .slider_section .img-box img {
-  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  object-fit: contain;
   -webkit-animation: upDown 5s infinite;
           animation: upDown 5s infinite;
 }
@@ -1033,4 +1043,21 @@ a:focus {
     font-size: 2rem;
   }
 }
+
+/* Mobile slider fixes */
+@media (max-width: 768px) {
+  .slider_section {
+    padding: 30px 0 80px 0;
+  }
+  
+  .slider_section .img-box {
+    height: 250px;
+    margin: 20px 0;
+  }
+  
+  .slider_section .detail-box h1 {
+    font-size: 2rem;
+  }
+}
+
 /* End Fix slider height jumping */
